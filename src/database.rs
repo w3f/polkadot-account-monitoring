@@ -1,4 +1,4 @@
-use super::Result;
+use crate::Result;
 use mongodb::Client;
 
 pub struct Database {
@@ -7,10 +7,8 @@ pub struct Database {
 
 impl Database {
     pub async fn new(uri: &str) -> Result<Self> {
-        Ok(
-            Database {
-                db: Client::with_uri_str(uri).await?,
-            }
-        )
+        Ok(Database {
+            db: Client::with_uri_str(uri).await?,
+        })
     }
 }
