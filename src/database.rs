@@ -78,9 +78,7 @@ impl Database {
             })
             .collect();
 
-        coll.insert_many(extrinsics, None).await?;
-
-        Ok(0)
+        Ok(coll.insert_many(extrinsics, None).await?.inserted_ids.len())
     }
     pub async fn store_reward_slash_event(
         &self,
@@ -100,8 +98,10 @@ impl Database {
             })
             .collect();
 
-        coll.insert_many(reward_slashes, None).await?;
-
-        Ok(0)
+        Ok(coll
+            .insert_many(reward_slashes, None)
+            .await?
+            .inserted_ids
+            .len())
     }
 }
