@@ -10,3 +10,4 @@ anyhow = "1.0.40"
 reqwest = "0.11.3"
 serde = { version = "1.0.126", features = ["derive"] }
 mongodb = "2.0.0-beta.1"
+bson = "2.0.0-beta.1"

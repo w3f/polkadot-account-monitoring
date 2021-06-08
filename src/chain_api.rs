@@ -1,4 +1,4 @@
-use crate::{Address, Result};
+use crate::{Result, Stash};
 use reqwest::Client;
 use serde::{de::DeserializeOwned, Serialize};
 
@@ -26,32 +26,32 @@ impl ChainApi {
             .await
             .map_err(|err| err.into())
     }
-    async fn request_transfers(
+    pub async fn request_transfers(
         &self,
-        address: Address,
+        stash: &Stash,
         row: usize,
         page: usize,
     ) -> Result<Response<TransferPage>> {
         self.post(
             "https://polkadot.api.subscan.io/api/scan/transfers",
             &PageBody {
-                address: address.as_str(),
+                address: stash.as_str(),
                 row: row,
                 page: page,
             },
         )
         .await
     }
-    async fn request_reward_slash(
+    pub async fn request_reward_slash(
         &self,
-        address: Address,
+        stash: &Stash,
         row: usize,
         page: usize,
     ) -> Result<Response<RewardSlashPage>> {
         self.post(
             "https://polkadot.api.subscan.io/api/scan/account/reward_slash",
             &PageBody {
-                address: address.as_str(),
+                address: stash.as_str(),
                 row: row,
                 page: page,
             },
@@ -78,8 +78,8 @@ pub struct Response<T> {
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub struct TransferPage {
-    count: usize,
-    transfers: Vec<Transfer>,
+    pub count: usize,
+    pub transfers: Vec<Transfer>,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -110,7 +110,7 @@ pub struct Transfer {
 pub struct FromAccountDisplay {
     #[serde(rename = "account_index")]
     pub account_index: String,
-    pub address: String,
+    pub Stash: String,
     pub display: String,
     pub identity: bool,
     //pub judgements: ::serde_json::Value,
@@ -124,7 +124,7 @@ pub struct FromAccountDisplay {
 pub struct ToAccountDisplay {
     #[serde(rename = "account_index")]
     pub account_index: String,
-    pub address: String,
+    pub Stash: String,
     pub display: String,
     pub identity: bool,
     //pub judgements: ::serde_json::Value,
