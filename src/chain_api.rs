@@ -31,7 +31,7 @@ impl ChainApi {
     }
     pub async fn request_extrinsics(
         &mut self,
-        stash: &Context,
+        context: &Context,
         row: usize,
         page: usize,
     ) -> Result<Response<ExtrinsicsPage>> {
@@ -39,7 +39,7 @@ impl ChainApi {
             .post(
                 "https://polkadot.api.subscan.io/api/scan/extrinsics",
                 &PageBody {
-                    address: stash.as_str(),
+                    address: context.as_str(),
                     row: row,
                     page: page,
                 },
@@ -100,10 +100,10 @@ struct PageBody<'a> {
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Response<T> {
-    code: usize,
-    data: T,
-    message: String,
-    ttl: usize,
+    pub code: usize,
+    pub data: T,
+    pub message: String,
+    pub ttl: usize,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
