@@ -137,7 +137,7 @@ pub struct ToAccountDisplay {
 #[serde(rename_all = "snake_case")]
 pub struct RewardSlashPage {
     count: usize,
-    list: Vec<RewardSlash>,
+    pub list: Vec<RewardSlash>,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]

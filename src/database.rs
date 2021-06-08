@@ -1,4 +1,4 @@
-use crate::chain_api::{Transfer, TransferPage};
+use crate::chain_api::{RewardSlash, RewardSlashPage, Transfer, TransferPage};
 use crate::{Context, Result};
 use bson::{doc, from_document, to_bson, to_document, Bson, Document};
 use mongodb::{Client, Database as MongoDb};
@@ -6,6 +6,7 @@ use serde::Serialize;
 use std::borrow::Cow;
 
 const TRANSFER_EVENTS_RAW: &'static str = "events_transfer_raw";
+const REWARD_SLASH_EVENTS_RAW: &'static str = "events_transfer_raw";
 
 /// Convenience trait. Converts a value to BSON.
 trait ToBson {
@@ -78,6 +79,28 @@ impl Database {
             .collect();
 
         coll.insert_many(transfers, None).await?;
+
+        Ok(0)
+    }
+    pub async fn store_reward_slash_event(
+        &self,
+        context: &Context,
+        event: &RewardSlashPage,
+    ) -> Result<usize> {
+        let coll = self
+            .db
+            .collection::<ContextData<RewardSlash>>(REWARD_SLASH_EVENTS_RAW);
+
+        let reward_slashes: Vec<ContextData<RewardSlash>> = event
+            .list
+            .iter()
+            .map(|rs| ContextData {
+                context: Cow::Borrowed(context),
+                data: Cow::Borrowed(rs),
+            })
+            .collect();
+
+        coll.insert_many(reward_slashes, None).await?;
 
         Ok(0)
     }
