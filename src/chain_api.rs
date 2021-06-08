@@ -1,15 +1,18 @@
 use crate::{Context, Result};
 use reqwest::Client;
 use serde::{de::DeserializeOwned, Serialize};
+use std::collections::HashSet;
 
 pub struct ChainApi {
     client: Client,
+    cache_extrinsics: HashSet<ExtrinsicHash>,
 }
 
 impl ChainApi {
     pub fn new() -> Self {
         ChainApi {
             client: Client::new(),
+            cache_extrinsics: HashSet::new(),
         }
     }
     async fn post<T, R>(&self, url: &str, param: &T) -> Result<R>
@@ -27,20 +30,34 @@ impl ChainApi {
             .map_err(|err| err.into())
     }
     pub async fn request_extrinsics(
-        &self,
+        &mut self,
         stash: &Context,
         row: usize,
         page: usize,
     ) -> Result<Response<ExtrinsicsPage>> {
-        self.post(
-            "https://polkadot.api.subscan.io/api/scan/extrinsics",
-            &PageBody {
-                address: stash.as_str(),
-                row: row,
-                page: page,
-            },
-        )
-        .await
+        let mut resp: Response<ExtrinsicsPage> = self
+            .post(
+                "https://polkadot.api.subscan.io/api/scan/extrinsics",
+                &PageBody {
+                    address: stash.as_str(),
+                    row: row,
+                    page: page,
+                },
+            )
+            .await?;
+
+        // Only keep unprocessed extrinsic hashes.
+        resp.data
+            .extrinsics
+            .retain(|extrinsic| self.cache_extrinsics.contains(&extrinsic.extrinsic_hash));
+
+        // Cache new extrinsic hashes.
+        resp.data.extrinsics.iter().for_each(|extrinsic| {
+            self.cache_extrinsics.insert(extrinsic.extrinsic_hash.clone());
+            }
+        );
+
+        Ok(resp)
     }
     pub async fn request_reward_slash(
         &self,
@@ -90,7 +107,7 @@ pub struct Extrinsic {
     pub block_timestamp: i64,
     pub call_module: String,
     pub call_module_function: String,
-    pub extrinsic_hash: String,
+    pub extrinsic_hash: ExtrinsicHash,
     pub extrinsic_index: String,
     pub fee: String,
     pub nonce: i64,
@@ -98,6 +115,9 @@ pub struct Extrinsic {
     pub signature: String,
     pub success: bool,
 }
+
+#[derive(Default, Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
+pub struct ExtrinsicHash(String);
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]

@@ -4,13 +4,13 @@ use crate::{Context, Result};
 
 const ROW_AMOUNT: usize = 25;
 
-pub async fn run_transfer_listener(Contextes: Vec<Context>) -> Result<()> {
-    let chain = ChainApi::new();
+pub async fn run_transfer_listener(contextes: Vec<Context>) -> Result<()> {
+    let mut chain = ChainApi::new();
     let db = Database::new("", "").await?;
 
     let mut page = 1;
-    for Context in &Contextes {
-        let resp = chain.request_extrinsics(Context, ROW_AMOUNT, page).await?;
+    for context in &contextes {
+        let resp = chain.request_extrinsics(context, ROW_AMOUNT, page).await?;
     }
 
     Ok(())
