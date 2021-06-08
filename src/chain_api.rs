@@ -1,4 +1,4 @@
-use crate::{Result, Stash};
+use crate::{Context, Result};
 use reqwest::Client;
 use serde::{de::DeserializeOwned, Serialize};
 
@@ -28,7 +28,7 @@ impl ChainApi {
     }
     pub async fn request_transfers(
         &self,
-        stash: &Stash,
+        stash: &Context,
         row: usize,
         page: usize,
     ) -> Result<Response<TransferPage>> {
@@ -44,7 +44,7 @@ impl ChainApi {
     }
     pub async fn request_reward_slash(
         &self,
-        stash: &Stash,
+        stash: &Context,
         row: usize,
         page: usize,
     ) -> Result<Response<RewardSlashPage>> {
@@ -110,7 +110,7 @@ pub struct Transfer {
 pub struct FromAccountDisplay {
     #[serde(rename = "account_index")]
     pub account_index: String,
-    pub Stash: String,
+    pub Context: String,
     pub display: String,
     pub identity: bool,
     //pub judgements: ::serde_json::Value,
@@ -124,7 +124,7 @@ pub struct FromAccountDisplay {
 pub struct ToAccountDisplay {
     #[serde(rename = "account_index")]
     pub account_index: String,
-    pub Stash: String,
+    pub Context: String,
     pub display: String,
     pub identity: bool,
     //pub judgements: ::serde_json::Value,

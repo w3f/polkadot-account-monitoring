@@ -1,5 +1,5 @@
 use crate::chain_api::{Transfer, TransferPage};
-use crate::{Result, Stash};
+use crate::{Context, Result};
 use bson::{doc, from_document, to_bson, to_document, Bson, Document};
 use mongodb::{Client, Database as MongoDb};
 use serde::Serialize;
@@ -24,8 +24,8 @@ impl<T: Serialize> ToBson for T {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub struct StashContextData<'a, T: Clone> {
-    stash: Cow<'a, Stash>,
+pub struct ContextData<'a, T: Clone> {
+    context: Cow<'a, Context>,
     data: Cow<'a, T>,
 }
 
@@ -57,18 +57,22 @@ impl Database {
 
         Ok(Database { db: db })
     }
-    pub async fn store_transfer_event(&self, stash: &Stash, event: &TransferPage) -> Result<usize> {
+    pub async fn store_transfer_event(
+        &self,
+        context: &Context,
+        event: &TransferPage,
+    ) -> Result<usize> {
         let coll = self
             .db
-            .collection::<StashContextData<Transfer>>(TRANSFER_EVENTS_RAW);
+            .collection::<ContextData<Transfer>>(TRANSFER_EVENTS_RAW);
 
         // Add the full context to each transfer, so the corresponding account
         // can be identified.
-        let transfers: Vec<StashContextData<Transfer>> = event
+        let transfers: Vec<ContextData<Transfer>> = event
             .transfers
             .iter()
-            .map(|t| StashContextData {
-                stash: Cow::Borrowed(stash),
+            .map(|t| ContextData {
+                context: Cow::Borrowed(context),
                 data: Cow::Borrowed(t),
             })
             .collect();
