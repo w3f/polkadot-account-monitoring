@@ -10,7 +10,7 @@ pub async fn run_transfer_listener(Contextes: Vec<Context>) -> Result<()> {
 
     let mut page = 1;
     for Context in &Contextes {
-        let resp = chain.request_transfers(Context, ROW_AMOUNT, page).await?;
+        let resp = chain.request_extrinsics(Context, ROW_AMOUNT, page).await?;
     }
 
     Ok(())

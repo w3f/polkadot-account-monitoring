@@ -26,14 +26,14 @@ impl ChainApi {
             .await
             .map_err(|err| err.into())
     }
-    pub async fn request_transfers(
+    pub async fn request_extrinsics(
         &self,
         stash: &Context,
         row: usize,
         page: usize,
-    ) -> Result<Response<TransferPage>> {
+    ) -> Result<Response<ExtrinsicsPage>> {
         self.post(
-            "https://polkadot.api.subscan.io/api/scan/transfers",
+            "https://polkadot.api.subscan.io/api/scan/extrinsics",
             &PageBody {
                 address: stash.as_str(),
                 row: row,
@@ -47,7 +47,7 @@ impl ChainApi {
         stash: &Context,
         row: usize,
         page: usize,
-    ) -> Result<Response<RewardSlashPage>> {
+    ) -> Result<Response<RewardsSlashesPage>> {
         self.post(
             "https://polkadot.api.subscan.io/api/scan/account/reward_slash",
             &PageBody {
@@ -76,66 +76,32 @@ pub struct Response<T> {
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub struct TransferPage {
-    pub count: usize,
-    pub transfers: Vec<Transfer>,
+pub struct ExtrinsicsPage {
+    pub count: i64,
+    pub extrinsics: Vec<Extrinsic>,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub struct Transfer {
-    pub amount: String,
-    #[serde(rename = "block_num")]
+pub struct Extrinsic {
+    pub account_display: serde_json::Value,
+    pub account_id: String,
+    pub account_index: String,
     pub block_num: i64,
-    #[serde(rename = "block_timestamp")]
     pub block_timestamp: i64,
-    #[serde(rename = "extrinsic_index")]
+    pub call_module: String,
+    pub call_module_function: String,
+    pub extrinsic_hash: String,
     pub extrinsic_index: String,
     pub fee: String,
-    pub from: String,
-    #[serde(rename = "from_account_display")]
-    pub from_account_display: FromAccountDisplay,
-    pub hash: String,
-    pub module: String,
     pub nonce: i64,
+    pub params: String,
+    pub signature: String,
     pub success: bool,
-    pub to: String,
-    #[serde(rename = "to_account_display")]
-    pub to_account_display: ToAccountDisplay,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub struct FromAccountDisplay {
-    #[serde(rename = "account_index")]
-    pub account_index: String,
-    pub Context: String,
-    pub display: String,
-    pub identity: bool,
-    //pub judgements: ::serde_json::Value,
-    pub parent: String,
-    #[serde(rename = "parent_display")]
-    pub parent_display: String,
-}
-
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub struct ToAccountDisplay {
-    #[serde(rename = "account_index")]
-    pub account_index: String,
-    pub Context: String,
-    pub display: String,
-    pub identity: bool,
-    //pub judgements: ::serde_json::Value,
-    pub parent: String,
-    #[serde(rename = "parent_display")]
-    pub parent_display: String,
-}
-
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub struct RewardSlashPage {
+pub struct RewardsSlashesPage {
     count: usize,
     pub list: Vec<RewardSlash>,
 }

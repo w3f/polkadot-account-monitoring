@@ -1,4 +1,4 @@
-use crate::chain_api::{RewardSlash, RewardSlashPage, Transfer, TransferPage};
+use crate::chain_api::{Extrinsic, ExtrinsicsPage, RewardSlash, RewardsSlashesPage};
 use crate::{Context, Result};
 use bson::{doc, from_document, to_bson, to_document, Bson, Document};
 use mongodb::{Client, Database as MongoDb};
@@ -58,19 +58,19 @@ impl Database {
 
         Ok(Database { db: db })
     }
-    pub async fn store_transfer_event(
+    pub async fn store_extrinsic_event(
         &self,
         context: &Context,
-        event: &TransferPage,
+        event: &ExtrinsicsPage,
     ) -> Result<usize> {
         let coll = self
             .db
-            .collection::<ContextData<Transfer>>(TRANSFER_EVENTS_RAW);
+            .collection::<ContextData<Extrinsic>>(TRANSFER_EVENTS_RAW);
 
         // Add the full context to each transfer, so the corresponding account
         // can be identified.
-        let transfers: Vec<ContextData<Transfer>> = event
-            .transfers
+        let extrinsics: Vec<ContextData<Extrinsic>> = event
+            .extrinsics
             .iter()
             .map(|t| ContextData {
                 context: Cow::Borrowed(context),
@@ -78,14 +78,14 @@ impl Database {
             })
             .collect();
 
-        coll.insert_many(transfers, None).await?;
+        coll.insert_many(extrinsics, None).await?;
 
         Ok(0)
     }
     pub async fn store_reward_slash_event(
         &self,
         context: &Context,
-        event: &RewardSlashPage,
+        event: &RewardsSlashesPage,
     ) -> Result<usize> {
         let coll = self
             .db
