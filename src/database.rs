@@ -5,7 +5,7 @@ use mongodb::{Client, Database as MongoDb};
 use serde::Serialize;
 use std::borrow::Cow;
 
-const TRANSFER_EVENTS_RAW: &'static str = "events_transfer_raw";
+const EXTRINSIC_EVENTS_RAW: &'static str = "events_transfer_raw";
 const REWARD_SLASH_EVENTS_RAW: &'static str = "events_transfer_raw";
 
 /// Convenience trait. Converts a value to BSON.
@@ -43,11 +43,26 @@ impl Database {
         // https://github.com/mongodb/mongo-rust-driver/pull/188
         db.run_command(
             doc! {
-                "createIndexes": TRANSFER_EVENTS_RAW.to_bson()?,
+                "createIndexes": EXTRINSIC_EVENTS_RAW.to_bson()?,
                 "indexes": [
                     {
-                        "key": { "data.extrinsic_index": 1 },
-                        "name": "transfer_extrinsic_id_constraint",
+                        "key": { "data.extrinsic_hash": 1 },
+                        "name": format!("{}_extrinsic_hash_index", EXTRINSIC_EVENTS_RAW),
+                        "unique": true
+                    },
+                ]
+            },
+            None,
+        )
+        .await?;
+
+        db.run_command(
+            doc! {
+                "createIndexes": EXTRINSIC_EVENTS_RAW.to_bson()?,
+                "indexes": [
+                    {
+                        "key": { "data.extrinsic_hash": 1 },
+                        "name": format!("{}_extrinsic_hash_index", REWARD_SLASH_EVENTS_RAW),
                         "unique": true
                     },
                 ]
@@ -65,7 +80,7 @@ impl Database {
     ) -> Result<usize> {
         let coll = self
             .db
-            .collection::<ContextData<Extrinsic>>(TRANSFER_EVENTS_RAW);
+            .collection::<ContextData<Extrinsic>>(EXTRINSIC_EVENTS_RAW);
 
         // Add the full context to each transfer, so the corresponding account
         // can be identified.
@@ -78,6 +93,8 @@ impl Database {
             })
             .collect();
 
+        // Insert new events. Return count of how many were updates (note that
+        // extrinsic hashes have an unique constraint).
         Ok(coll.insert_many(extrinsics, None).await?.inserted_ids.len())
     }
     pub async fn store_reward_slash_event(
@@ -89,6 +106,8 @@ impl Database {
             .db
             .collection::<ContextData<RewardSlash>>(REWARD_SLASH_EVENTS_RAW);
 
+        // Add the full context to each transfer, so the corresponding account
+        // can be identified.
         let reward_slashes: Vec<ContextData<RewardSlash>> = event
             .list
             .iter()
@@ -98,6 +117,8 @@ impl Database {
             })
             .collect();
 
+        // Insert new events. Return count of how many were updates (note that
+        // extrinsic hashes have an unique constraint).
         Ok(coll
             .insert_many(reward_slashes, None)
             .await?
