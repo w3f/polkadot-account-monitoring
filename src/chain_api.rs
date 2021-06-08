@@ -53,27 +53,41 @@ impl ChainApi {
 
         // Cache new extrinsic hashes.
         resp.data.extrinsics.iter().for_each(|extrinsic| {
-            self.cache_extrinsics.insert(extrinsic.extrinsic_hash.clone());
-            }
-        );
+            self.cache_extrinsics
+                .insert(extrinsic.extrinsic_hash.clone());
+        });
 
         Ok(resp)
     }
     pub async fn request_reward_slash(
-        &self,
+        &mut self,
         stash: &Context,
         row: usize,
         page: usize,
     ) -> Result<Response<RewardsSlashesPage>> {
-        self.post(
-            "https://polkadot.api.subscan.io/api/scan/account/reward_slash",
-            &PageBody {
-                address: stash.as_str(),
-                row: row,
-                page: page,
-            },
-        )
-        .await
+        let mut resp: Response<RewardsSlashesPage> = self
+            .post(
+                "https://polkadot.api.subscan.io/api/scan/account/reward_slash",
+                &PageBody {
+                    address: stash.as_str(),
+                    row: row,
+                    page: page,
+                },
+            )
+            .await?;
+
+        // Only keep unprocessed extrinsic hashes.
+        resp.data
+            .list
+            .retain(|reward_slash| self.cache_extrinsics.contains(&reward_slash.extrinsic_hash));
+
+        // Cache new extrinsic hashes.
+        resp.data.list.iter().for_each(|reward_slash| {
+            self.cache_extrinsics
+                .insert(reward_slash.extrinsic_hash.clone());
+        });
+
+        Ok(resp)
     }
 }
 
@@ -135,6 +149,6 @@ pub struct RewardSlash {
     pub module_id: String,
     pub event_id: String,
     pub params: String,
-    pub extrinsic_hash: String,
+    pub extrinsic_hash: ExtrinsicHash,
     pub event_idx: i64,
 }
