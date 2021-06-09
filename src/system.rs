@@ -1,4 +1,4 @@
-use crate::chain_api::{ChainApi, ExtrinsicsPage, Response};
+use crate::chain_api::{ChainApi, Response, TransfersPage};
 use crate::database::Database;
 use crate::{Context, Result};
 use tokio::time::{interval, Duration};
@@ -6,14 +6,14 @@ use tokio::time::{interval, Duration};
 const ROW_AMOUNT: usize = 25;
 const INTERVAL_SECS: u64 = 5;
 
-pub struct ExtrinsicFetcher {
+pub struct TransferFetcher {
     api: ChainApi,
     db: Database,
 }
 
 #[async_trait]
-impl FetchChainData for ExtrinsicFetcher {
-    type Data = Response<ExtrinsicsPage>;
+impl FetchChainData for TransferFetcher {
+    type Data = Response<TransfersPage>;
 
     async fn fetch_data(
         &mut self,
@@ -42,12 +42,12 @@ pub trait DataInfo {
 }
 
 #[async_trait]
-impl DataInfo for Response<ExtrinsicsPage> {
+impl DataInfo for Response<TransfersPage> {
     fn is_empty(&self) -> bool {
         <Self as DataInfo>::new_count(self) == 0
     }
     fn new_count(&self) -> usize {
-        self.data.extrinsics.len()
+        self.data.transfers.len()
     }
 }
 

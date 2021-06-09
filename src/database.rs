@@ -1,4 +1,4 @@
-use crate::chain_api::{Extrinsic, ExtrinsicsPage, Response, RewardSlash, RewardsSlashesPage};
+use crate::chain_api::{Response, RewardSlash, RewardsSlashesPage, Transfer, TransfersPage};
 use crate::{Context, Result};
 use bson::{doc, from_document, to_bson, to_document, Bson, Document};
 use mongodb::options::{InsertManyOptions, UpdateOptions};
@@ -37,57 +37,24 @@ pub struct Database {
 
 impl Database {
     pub async fn new(uri: &str, db: &str) -> Result<Self> {
-        let db = Client::with_uri_str(uri).await?.database(db);
-
-        // Currently, the Rust MongoDb driver does not support indexing
-        // natively. This is the current workaround. See
-        // https://github.com/mongodb/mongo-rust-driver/pull/188
-        db.run_command(
-            doc! {
-                "createIndexes": EXTRINSIC_EVENTS_RAW.to_bson()?,
-                "indexes": [
-                    {
-                        "key": { "data.extrinsic_hash": 1 },
-                        "name": format!("{}_extrinsic_hash_index", EXTRINSIC_EVENTS_RAW),
-                        "unique": true
-                    },
-                ]
-            },
-            None,
-        )
-        .await?;
-
-        db.run_command(
-            doc! {
-                "createIndexes": REWARD_SLASH_EVENTS_RAW.to_bson()?,
-                "indexes": [
-                    {
-                        "key": { "data.extrinsic_hash": 1 },
-                        "name": format!("{}_extrinsic_hash_index", REWARD_SLASH_EVENTS_RAW),
-                        "unique": true
-                    },
-                ]
-            },
-            None,
-        )
-        .await?;
-
-        Ok(Database { db: db })
+        Ok(Database {
+            db: Client::with_uri_str(uri).await?.database(db),
+        })
     }
     pub async fn store_extrinsic_event(
         &self,
         context: &Context,
-        data: &Response<ExtrinsicsPage>,
+        data: &Response<TransfersPage>,
     ) -> Result<usize> {
         let coll = self
             .db
-            .collection::<ContextData<Extrinsic>>(EXTRINSIC_EVENTS_RAW);
+            .collection::<ContextData<Transfer>>(EXTRINSIC_EVENTS_RAW);
 
         // Add the full context to each transfer, so the corresponding account
         // can be identified.
-        let extrinsics: Vec<ContextData<Extrinsic>> = data
+        let extrinsics: Vec<ContextData<Transfer>> = data
             .data
-            .extrinsics
+            .transfers
             .iter()
             .map(|t| ContextData {
                 context: Cow::Borrowed(context),
@@ -101,7 +68,8 @@ impl Database {
             let res = coll
                 .update_one(
                     doc! {
-                        "data.extrinsic_hash": extrinsic.data.extrinsic_hash.to_bson()?,
+                        "context": context.to_bson()?,
+                        "data.extrinsic_index": extrinsic.data.extrinsic_index.to_bson()?,
                     },
                     doc! {
                         "$setOnInsert": extrinsic.to_bson()?,
@@ -147,6 +115,7 @@ impl Database {
             let res = coll
                 .update_one(
                     doc! {
+                        "context": context.to_bson()?,
                         "data.extrinsic_hash": reward_slash.data.extrinsic_hash.to_bson()?,
                     },
                     doc! {
@@ -171,7 +140,7 @@ impl Database {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::chain_api::{ExtrinsicHash, ExtrinsicsPage, Response};
+    use crate::chain_api::{Response, Transfer, TransfersPage};
     use crate::Context;
     use rand::{thread_rng, Rng};
 
@@ -190,13 +159,13 @@ mod tests {
         let bob = Context::bob();
 
         // Gen test data
-        let mut resp: Response<ExtrinsicsPage> = Default::default();
-        resp.data.extrinsics = vec![Default::default(); 10];
+        let mut resp: Response<TransfersPage> = Default::default();
+        resp.data.transfers = vec![Default::default(); 10];
         resp.data
-            .extrinsics
+            .transfers
             .iter_mut()
             .enumerate()
-            .for_each(|(idx, e)| e.extrinsic_hash = idx.to_string().into());
+            .for_each(|(idx, t)| t.extrinsic_index = idx.to_string().into());
 
         // New data is inserted
         let count = db.store_extrinsic_event(&alice, &resp).await.unwrap();
@@ -207,14 +176,14 @@ mod tests {
         assert_eq!(count, 0);
 
         // Gen new test data
-        let mut new_resp: Response<ExtrinsicsPage> = Default::default();
-        new_resp.data.extrinsics = vec![Default::default(); 15];
+        let mut new_resp: Response<TransfersPage> = Default::default();
+        new_resp.data.transfers = vec![Default::default(); 15];
         new_resp
             .data
-            .extrinsics
+            .transfers
             .iter_mut()
             .enumerate()
-            .for_each(|(idx, e)| e.extrinsic_hash = (idx + 10).to_string().into());
+            .for_each(|(idx, t)| t.extrinsic_index = (idx + 10).to_string().into());
 
         // New data is inserted
         let count = db.store_extrinsic_event(&bob, &new_resp).await.unwrap();
@@ -224,9 +193,9 @@ mod tests {
         let count = db.store_extrinsic_event(&bob, &new_resp).await.unwrap();
         assert_eq!(count, 0);
 
-        // No new data is inserted (previous data)
+        // Insert previous data (under a new context)
         let count = db.store_extrinsic_event(&bob, &resp).await.unwrap();
-        assert_eq!(count, 0);
+        assert_eq!(count, 10);
     }
 
     #[tokio::test]
@@ -278,8 +247,8 @@ mod tests {
         let count = db.store_reward_slash_event(&bob, &new_resp).await.unwrap();
         assert_eq!(count, 0);
 
-        // No new data is inserted (previous data)
+        // Insert previous data (under a new context)
         let count = db.store_reward_slash_event(&bob, &resp).await.unwrap();
-        assert_eq!(count, 0);
+        assert_eq!(count, 10);
     }
 }

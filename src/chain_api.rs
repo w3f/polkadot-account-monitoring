@@ -6,6 +6,7 @@ use std::collections::HashSet;
 pub struct ChainApi {
     client: Client,
     cache_extrinsics: HashSet<ExtrinsicHash>,
+    cache_index: HashSet<ExtrinsicIndex>,
 }
 
 impl ChainApi {
@@ -13,6 +14,7 @@ impl ChainApi {
         ChainApi {
             client: Client::new(),
             cache_extrinsics: HashSet::new(),
+            cache_index: HashSet::new(),
         }
     }
     async fn post<T, R>(&self, url: &str, param: &T) -> Result<R>
@@ -34,8 +36,8 @@ impl ChainApi {
         context: &Context,
         row: usize,
         page: usize,
-    ) -> Result<Response<ExtrinsicsPage>> {
-        let mut resp: Response<ExtrinsicsPage> = self
+    ) -> Result<Response<TransfersPage>> {
+        let mut resp: Response<TransfersPage> = self
             .post(
                 "https://polkadot.api.subscan.io/api/scan/extrinsics",
                 &PageBody {
@@ -46,15 +48,14 @@ impl ChainApi {
             )
             .await?;
 
-        // Only keep unprocessed extrinsic hashes.
+        // Only keep unprocessed extrinsic indexes .
         resp.data
-            .extrinsics
-            .retain(|extrinsic| self.cache_extrinsics.contains(&extrinsic.extrinsic_hash));
+            .transfers
+            .retain(|transfer| self.cache_index.contains(&transfer.extrinsic_index));
 
-        // Cache new extrinsic hashes.
-        resp.data.extrinsics.iter().for_each(|extrinsic| {
-            self.cache_extrinsics
-                .insert(extrinsic.extrinsic_hash.clone());
+        // Cache new transfer hashes.
+        resp.data.transfers.iter().for_each(|transfer| {
+            self.cache_index.insert(transfer.extrinsic_index.clone());
         });
 
         Ok(resp)
@@ -107,28 +108,52 @@ pub struct Response<T> {
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct ExtrinsicsPage {
+pub struct TransfersPage {
     pub count: i64,
-    pub extrinsics: Vec<Extrinsic>,
+    pub transfers: Vec<Transfer>,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct Extrinsic {
-    pub account_display: serde_json::Value,
-    pub account_id: String,
-    pub account_index: String,
+pub struct Transfer {
+    pub amount: String,
     pub block_num: i64,
     pub block_timestamp: i64,
-    pub call_module: String,
-    pub call_module_function: String,
-    pub extrinsic_hash: ExtrinsicHash,
-    pub extrinsic_index: String,
+    pub extrinsic_index: ExtrinsicIndex,
     pub fee: String,
+    pub from: String,
+    pub from_account_display: FromAccountDisplay,
+    pub hash: String,
+    pub module: String,
     pub nonce: i64,
-    pub params: String,
-    pub signature: String,
     pub success: bool,
+    pub to: String,
+    pub to_account_display: ToAccountDisplay,
 }
+
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct FromAccountDisplay {
+    pub account_index: String,
+    pub address: String,
+    pub display: String,
+    pub identity: bool,
+    pub judgements: ::serde_json::Value,
+    pub parent: String,
+    pub parent_display: String,
+}
+
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ToAccountDisplay {
+    pub account_index: String,
+    pub address: String,
+    pub display: String,
+    pub identity: bool,
+    pub judgements: ::serde_json::Value,
+    pub parent: String,
+    pub parent_display: String,
+}
+
+#[derive(Default, Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
+pub struct ExtrinsicIndex(String);
 
 #[derive(Default, Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub struct ExtrinsicHash(String);
@@ -156,6 +181,12 @@ pub struct RewardSlash {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    impl From<String> for ExtrinsicIndex {
+        fn from(val: String) -> Self {
+            ExtrinsicIndex(val)
+        }
+    }
 
     impl From<String> for ExtrinsicHash {
         fn from(val: String) -> Self {
