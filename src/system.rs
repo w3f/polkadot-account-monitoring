@@ -1,6 +1,7 @@
 use crate::chain_api::{ChainApi, Response, TransfersPage};
 use crate::database::Database;
 use crate::{Context, Result};
+use std::sync::Arc;
 use tokio::time::{interval, Duration};
 
 const ROW_AMOUNT: usize = 25;
@@ -15,12 +16,7 @@ pub struct TransferFetcher {
 impl FetchChainData for TransferFetcher {
     type Data = Response<TransfersPage>;
 
-    async fn fetch_data(
-        &mut self,
-        context: &Context,
-        row: usize,
-        page: usize,
-    ) -> Result<Self::Data> {
+    async fn fetch_data(&self, context: &Context, row: usize, page: usize) -> Result<Self::Data> {
         self.api.request_extrinsics(context, row, page).await
     }
     async fn store_data(&self, context: &Context, data: &Self::Data) -> Result<usize> {
@@ -32,7 +28,7 @@ impl FetchChainData for TransferFetcher {
 pub trait FetchChainData {
     type Data: DataInfo;
 
-    async fn fetch_data(&mut self, _: &Context, row: usize, page: usize) -> Result<Self::Data>;
+    async fn fetch_data(&self, _: &Context, row: usize, page: usize) -> Result<Self::Data>;
     async fn store_data(&self, _: &Context, data: &Self::Data) -> Result<usize>;
 }
 
@@ -48,6 +44,17 @@ impl DataInfo for Response<TransfersPage> {
     }
     fn new_count(&self) -> usize {
         self.data.transfers.len()
+    }
+}
+
+pub struct ScrapingService {
+    //db: Database,
+//api: Arc<>
+}
+
+impl ScrapingService {
+    pub fn new() -> Self {
+        ScrapingService {}
     }
 }
 

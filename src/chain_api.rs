@@ -2,19 +2,21 @@ use crate::{Context, Result};
 use reqwest::Client;
 use serde::{de::DeserializeOwned, Serialize};
 use std::collections::HashSet;
+use std::sync::Arc;
+use tokio::sync::RwLock;
 
 pub struct ChainApi {
     client: Client,
-    cache_extrinsics: HashSet<ExtrinsicHash>,
-    cache_index: HashSet<ExtrinsicIndex>,
+    cache_extrinsics: Arc<RwLock<HashSet<ExtrinsicHash>>>,
+    cache_index: Arc<RwLock<HashSet<ExtrinsicIndex>>>,
 }
 
 impl ChainApi {
     pub fn new() -> Self {
         ChainApi {
             client: Client::new(),
-            cache_extrinsics: HashSet::new(),
-            cache_index: HashSet::new(),
+            cache_extrinsics: Arc::new(RwLock::new(HashSet::new())),
+            cache_index: Arc::new(RwLock::new(HashSet::new())),
         }
     }
     async fn post<T, R>(&self, url: &str, param: &T) -> Result<R>
@@ -32,7 +34,7 @@ impl ChainApi {
             .map_err(|err| err.into())
     }
     pub async fn request_extrinsics(
-        &mut self,
+        &self,
         context: &Context,
         row: usize,
         page: usize,
@@ -49,14 +51,20 @@ impl ChainApi {
             .await?;
 
         // Only keep unprocessed extrinsic indexes .
-        resp.data
-            .transfers
-            .retain(|transfer| self.cache_index.contains(&transfer.extrinsic_index));
+        {
+            let cache = self.cache_index.read().await;
+            resp.data
+                .transfers
+                .retain(|transfer| cache.contains(&transfer.extrinsic_index));
+        }
 
         // Cache new transfer hashes.
-        resp.data.transfers.iter().for_each(|transfer| {
-            self.cache_index.insert(transfer.extrinsic_index.clone());
-        });
+        {
+            let mut cache = self.cache_index.write().await;
+            resp.data.transfers.iter().for_each(|transfer| {
+                cache.insert(transfer.extrinsic_index.clone());
+            });
+        }
 
         Ok(resp)
     }
@@ -78,15 +86,20 @@ impl ChainApi {
             .await?;
 
         // Only keep unprocessed extrinsic hashes.
-        resp.data
-            .list
-            .retain(|reward_slash| self.cache_extrinsics.contains(&reward_slash.extrinsic_hash));
+        {
+            let cache = self.cache_extrinsics.read().await;
+            resp.data
+                .list
+                .retain(|reward_slash| cache.contains(&reward_slash.extrinsic_hash));
+        }
 
         // Cache new extrinsic hashes.
-        resp.data.list.iter().for_each(|reward_slash| {
-            self.cache_extrinsics
-                .insert(reward_slash.extrinsic_hash.clone());
-        });
+        {
+            let mut cache = self.cache_extrinsics.write().await;
+            resp.data.list.iter().for_each(|reward_slash| {
+                cache.insert(reward_slash.extrinsic_hash.clone());
+            });
+        }
 
         Ok(resp)
     }
