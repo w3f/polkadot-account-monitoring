@@ -1,12 +1,13 @@
 use crate::chain_api::{Extrinsic, ExtrinsicsPage, Response, RewardSlash, RewardsSlashesPage};
 use crate::{Context, Result};
 use bson::{doc, from_document, to_bson, to_document, Bson, Document};
+use mongodb::options::{InsertManyOptions, UpdateOptions};
 use mongodb::{Client, Database as MongoDb};
 use serde::Serialize;
 use std::borrow::Cow;
 
-const EXTRINSIC_EVENTS_RAW: &'static str = "events_transfer_raw";
-const REWARD_SLASH_EVENTS_RAW: &'static str = "events_transfer_raw";
+const EXTRINSIC_EVENTS_RAW: &'static str = "extrinsics_raw";
+const REWARD_SLASH_EVENTS_RAW: &'static str = "rewards_slashes_raw";
 
 /// Convenience trait. Converts a value to BSON.
 trait ToBson {
@@ -47,6 +48,7 @@ impl Database {
                 "indexes": [
                     {
                         "key": { "data.extrinsic_hash": 1 },
+                        "name": format!("{}_extrinsic_hash_index", EXTRINSIC_EVENTS_RAW),
                         "unique": true
                     },
                 ]
@@ -61,6 +63,7 @@ impl Database {
                 "indexes": [
                     {
                         "key": { "data.extrinsic_hash": 1 },
+                        "name": format!("{}_extrinsic_hash_index", REWARD_SLASH_EVENTS_RAW),
                         "unique": true
                     },
                 ]
@@ -94,7 +97,29 @@ impl Database {
 
         // Insert new events. Return count of how many were updates (note that
         // extrinsic hashes have an unique constraint).
-        Ok(coll.insert_many(extrinsics, None).await?.inserted_ids.len())
+        let mut count = 0;
+        for extrinsic in &extrinsics {
+            let res = coll
+                .update_one(
+                    doc! {
+                        "data.extrinsic_hash": extrinsic.data.extrinsic_hash.to_bson()?,
+                    },
+                    doc! {
+                        "$setOnInsert": extrinsic.to_bson()?,
+                    },
+                    {
+                        let mut opt = UpdateOptions::default();
+                        opt.upsert = Some(true);
+                        Some(opt)
+                    },
+                )
+                .await?;
+
+            assert_eq!(res.modified_count, 0);
+            res.upserted_id.map(|_| count += 1);
+        }
+
+        Ok(count)
     }
     pub async fn store_reward_slash_event(
         &self,
@@ -130,8 +155,8 @@ impl Database {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::Context;
     use crate::chain_api::{ExtrinsicHash, ExtrinsicsPage, Response};
+    use crate::Context;
     use rand::{thread_rng, Rng};
 
     #[tokio::test]
@@ -149,11 +174,13 @@ mod tests {
         // Gen test data
         let mut resp: Response<ExtrinsicsPage> = Default::default();
         resp.data.extrinsics = vec![Default::default(); 10];
-        resp.data.extrinsics
+        resp.data
+            .extrinsics
             .iter_mut()
             .enumerate()
             .for_each(|(idx, e)| e.extrinsic_hash = idx.to_string().into());
 
+        //println!(">>>> {}", serde_json::to_string_pretty(&resp).unwrap());
         // New data is inserted
         let count = db.store_extrinsic_event(&alice, &resp).await.unwrap();
         assert_eq!(count, resp.data.extrinsics.len());
