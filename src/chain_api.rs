@@ -152,3 +152,14 @@ pub struct RewardSlash {
     pub extrinsic_hash: ExtrinsicHash,
     pub event_idx: i64,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    impl From<String> for ExtrinsicHash {
+        fn from(val: String) -> Self {
+            ExtrinsicHash(val)
+        }
+    }
+}

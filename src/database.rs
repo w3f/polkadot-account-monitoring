@@ -47,7 +47,6 @@ impl Database {
                 "indexes": [
                     {
                         "key": { "data.extrinsic_hash": 1 },
-                        "name": format!("{}_extrinsic_hash_index", EXTRINSIC_EVENTS_RAW),
                         "unique": true
                     },
                 ]
@@ -58,11 +57,10 @@ impl Database {
 
         db.run_command(
             doc! {
-                "createIndexes": EXTRINSIC_EVENTS_RAW.to_bson()?,
+                "createIndexes": REWARD_SLASH_EVENTS_RAW.to_bson()?,
                 "indexes": [
                     {
                         "key": { "data.extrinsic_hash": 1 },
-                        "name": format!("{}_extrinsic_hash_index", REWARD_SLASH_EVENTS_RAW),
                         "unique": true
                     },
                 ]
@@ -126,5 +124,42 @@ impl Database {
             .await?
             .inserted_ids
             .len())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::Context;
+    use crate::chain_api::{ExtrinsicHash, ExtrinsicsPage, Response};
+    use rand::{thread_rng, Rng};
+
+    #[tokio::test]
+    async fn store_extrinsic_event() {
+        let random: u32 = thread_rng().gen_range(u32::MIN..u32::MAX);
+        let db = Database::new(
+            "mongodb://localhost:27017/",
+            &format!("monitoring_test_{}", random),
+        )
+        .await
+        .unwrap();
+
+        let alice = Context::alice();
+
+        // Gen test data
+        let mut resp: Response<ExtrinsicsPage> = Default::default();
+        resp.data.extrinsics = vec![Default::default(); 10];
+        resp.data.extrinsics
+            .iter_mut()
+            .enumerate()
+            .for_each(|(idx, e)| e.extrinsic_hash = idx.to_string().into());
+
+        // New data is inserted
+        let count = db.store_extrinsic_event(&alice, &resp).await.unwrap();
+        assert_eq!(count, resp.data.extrinsics.len());
+
+        // No new data is inserted (unique constraint)
+        let count = db.store_extrinsic_event(&alice, &resp).await.unwrap();
+        assert_eq!(count, 0);
     }
 }
