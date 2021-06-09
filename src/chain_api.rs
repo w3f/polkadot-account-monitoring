@@ -141,7 +141,7 @@ pub struct RewardsSlashesPage {
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "snake_case")]
 pub struct RewardSlash {
     pub event_index: String,
     pub block_num: i64,

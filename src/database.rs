@@ -95,8 +95,7 @@ impl Database {
             })
             .collect();
 
-        // Insert new events. Return count of how many were updates (note that
-        // extrinsic hashes have an unique constraint).
+        // Insert new events. Return count of how many were newly inserted.
         let mut count = 0;
         for extrinsic in &extrinsics {
             let res = coll
@@ -142,13 +141,30 @@ impl Database {
             })
             .collect();
 
-        // Insert new events. Return count of how many were updates (note that
-        // extrinsic hashes have an unique constraint).
-        Ok(coll
-            .insert_many(reward_slashes, None)
-            .await?
-            .inserted_ids
-            .len())
+        // Insert new events. Return count of how many were newly inserted.
+        let mut count = 0;
+        for reward_slash in &reward_slashes {
+            let res = coll
+                .update_one(
+                    doc! {
+                        "data.extrinsic_hash": reward_slash.data.extrinsic_hash.to_bson()?,
+                    },
+                    doc! {
+                        "$setOnInsert": reward_slash.to_bson()?,
+                    },
+                    {
+                        let mut opt = UpdateOptions::default();
+                        opt.upsert = Some(true);
+                        Some(opt)
+                    },
+                )
+                .await?;
+
+            assert_eq!(res.modified_count, 0);
+            res.upserted_id.map(|_| count += 1);
+        }
+
+        Ok(count)
     }
 }
 
@@ -169,7 +185,9 @@ mod tests {
         .await
         .unwrap();
 
+        // Must now have an influence on data.
         let alice = Context::alice();
+        let bob = Context::bob();
 
         // Gen test data
         let mut resp: Response<ExtrinsicsPage> = Default::default();
@@ -180,13 +198,88 @@ mod tests {
             .enumerate()
             .for_each(|(idx, e)| e.extrinsic_hash = idx.to_string().into());
 
-        //println!(">>>> {}", serde_json::to_string_pretty(&resp).unwrap());
         // New data is inserted
         let count = db.store_extrinsic_event(&alice, &resp).await.unwrap();
-        assert_eq!(count, resp.data.extrinsics.len());
+        assert_eq!(count, 10);
 
-        // No new data is inserted (unique constraint)
+        // No new data is inserted
         let count = db.store_extrinsic_event(&alice, &resp).await.unwrap();
+        assert_eq!(count, 0);
+
+        // Gen new test data
+        let mut new_resp: Response<ExtrinsicsPage> = Default::default();
+        new_resp.data.extrinsics = vec![Default::default(); 15];
+        new_resp
+            .data
+            .extrinsics
+            .iter_mut()
+            .enumerate()
+            .for_each(|(idx, e)| e.extrinsic_hash = (idx + 10).to_string().into());
+
+        // New data is inserted
+        let count = db.store_extrinsic_event(&bob, &new_resp).await.unwrap();
+        assert_eq!(count, 15);
+
+        // No new data is inserted
+        let count = db.store_extrinsic_event(&bob, &new_resp).await.unwrap();
+        assert_eq!(count, 0);
+
+        // No new data is inserted (previous data)
+        let count = db.store_extrinsic_event(&bob, &resp).await.unwrap();
+        assert_eq!(count, 0);
+    }
+
+    #[tokio::test]
+    async fn store_reward_slash_event() {
+        let random: u32 = thread_rng().gen_range(u32::MIN..u32::MAX);
+        let db = Database::new(
+            "mongodb://localhost:27017/",
+            &format!("monitoring_test_{}", random),
+        )
+        .await
+        .unwrap();
+
+        // Must now have an influence on data.
+        let alice = Context::alice();
+        let bob = Context::bob();
+
+        // Gen test data
+        let mut resp: Response<RewardsSlashesPage> = Default::default();
+        resp.data.list = vec![Default::default(); 10];
+        resp.data
+            .list
+            .iter_mut()
+            .enumerate()
+            .for_each(|(idx, e)| e.extrinsic_hash = idx.to_string().into());
+
+        // New data is inserted
+        let count = db.store_reward_slash_event(&alice, &resp).await.unwrap();
+        assert_eq!(count, 10);
+
+        // No new data is inserted
+        let count = db.store_reward_slash_event(&alice, &resp).await.unwrap();
+        assert_eq!(count, 0);
+
+        // Gen new test data
+        let mut new_resp: Response<RewardsSlashesPage> = Default::default();
+        new_resp.data.list = vec![Default::default(); 15];
+        new_resp
+            .data
+            .list
+            .iter_mut()
+            .enumerate()
+            .for_each(|(idx, e)| e.extrinsic_hash = (idx + 10).to_string().into());
+
+        // New data is inserted
+        let count = db.store_reward_slash_event(&bob, &new_resp).await.unwrap();
+        assert_eq!(count, 15);
+
+        // No new data is inserted
+        let count = db.store_reward_slash_event(&bob, &new_resp).await.unwrap();
+        assert_eq!(count, 0);
+
+        // No new data is inserted (previous data)
+        let count = db.store_reward_slash_event(&bob, &resp).await.unwrap();
         assert_eq!(count, 0);
     }
 }
