@@ -3,12 +3,16 @@ use reqwest::Client;
 use serde::{de::DeserializeOwned, Serialize};
 use std::collections::HashSet;
 use std::sync::Arc;
-use tokio::sync::RwLock;
+use tokio::sync::{RwLock, Mutex};
+use tokio::time::{sleep, Duration};
+
+const REQUEST_TIMEOUT: u64 = 5;
 
 pub struct ChainApi {
     client: Client,
     cache_extrinsics: Arc<RwLock<HashSet<ExtrinsicHash>>>,
     cache_index: Arc<RwLock<HashSet<ExtrinsicIndex>>>,
+    guard_lock: Arc<Mutex<()>>,
 }
 
 impl ChainApi {
@@ -17,7 +21,18 @@ impl ChainApi {
             client: Client::new(),
             cache_extrinsics: Arc::new(RwLock::new(HashSet::new())),
             cache_index: Arc::new(RwLock::new(HashSet::new())),
+            guard_lock: Arc::new(Mutex::new(())),
         }
+    }
+    async fn time_guard(&self) {
+        let mutex = Arc::clone(&self.guard_lock);
+        let guard = mutex.lock_owned().await;
+
+        tokio::spawn(async move {
+            // Capture guard, drops after sleeping period;
+            let _ = guard;
+            sleep(Duration::from_secs(REQUEST_TIMEOUT)).await;
+        });
     }
     async fn post<T, R>(&self, url: &str, param: &T) -> Result<R>
     where
@@ -39,6 +54,8 @@ impl ChainApi {
         row: usize,
         page: usize,
     ) -> Result<Response<TransfersPage>> {
+        self.time_guard().await;
+
         let mut resp: Response<TransfersPage> = self
             .post(
                 "https://polkadot.api.subscan.io/api/scan/extrinsics",
@@ -74,6 +91,8 @@ impl ChainApi {
         row: usize,
         page: usize,
     ) -> Result<Response<RewardsSlashesPage>> {
+        self.time_guard().await;
+
         let mut resp: Response<RewardsSlashesPage> = self
             .post(
                 "https://polkadot.api.subscan.io/api/scan/account/reward_slash",
