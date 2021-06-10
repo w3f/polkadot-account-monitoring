@@ -3,7 +3,7 @@ use reqwest::Client;
 use serde::{de::DeserializeOwned, Serialize};
 use std::collections::HashSet;
 use std::sync::Arc;
-use tokio::sync::{RwLock, Mutex};
+use tokio::sync::{Mutex, RwLock};
 use tokio::time::{sleep, Duration};
 
 const REQUEST_TIMEOUT: u64 = 5;
@@ -58,7 +58,7 @@ impl ChainApi {
 
         let mut resp: Response<TransfersPage> = self
             .post(
-                "https://polkadot.api.subscan.io/api/scan/extrinsics",
+                "https://polkadot.api.subscan.io/api/scan/transfers",
                 &PageBody {
                     address: context.as_str(),
                     row: row,
@@ -67,20 +67,31 @@ impl ChainApi {
             )
             .await?;
 
+        if resp.data.transfers.is_none() {
+            return Ok(resp);
+        }
+
         // Only keep unprocessed extrinsic indexes .
         {
             let cache = self.cache_index.read().await;
             resp.data
                 .transfers
+                .as_mut()
+                .unwrap()
                 .retain(|transfer| cache.contains(&transfer.extrinsic_index));
         }
 
         // Cache new transfer hashes.
         {
             let mut cache = self.cache_index.write().await;
-            resp.data.transfers.iter().for_each(|transfer| {
-                cache.insert(transfer.extrinsic_index.clone());
-            });
+            resp.data
+                .transfers
+                .as_ref()
+                .unwrap()
+                .iter()
+                .for_each(|transfer| {
+                    cache.insert(transfer.extrinsic_index.clone());
+                });
         }
 
         Ok(resp)
@@ -142,7 +153,7 @@ pub struct Response<T> {
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct TransfersPage {
     pub count: i64,
-    pub transfers: Vec<Transfer>,
+    pub transfers: Option<Vec<Transfer>>,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -164,24 +175,30 @@ pub struct Transfer {
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct FromAccountDisplay {
-    pub account_index: String,
     pub address: String,
     pub display: String,
-    pub identity: bool,
     pub judgements: ::serde_json::Value,
-    pub parent: String,
-    pub parent_display: String,
+    pub account_index: String,
+    pub identity: bool,
+    pub parent: Option<Parent>,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ToAccountDisplay {
-    pub account_index: String,
     pub address: String,
     pub display: String,
-    pub identity: bool,
     pub judgements: ::serde_json::Value,
-    pub parent: String,
-    pub parent_display: String,
+    pub account_index: String,
+    pub identity: bool,
+    pub parent: Option<Parent>,
+}
+
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Parent {
+    pub address: String,
+    pub display: String,
+    pub sub_symbol: String,
+    pub identity: bool,
 }
 
 #[derive(Default, Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]

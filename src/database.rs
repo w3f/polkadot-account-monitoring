@@ -56,6 +56,8 @@ impl Database {
         let extrinsics: Vec<ContextData<Transfer>> = data
             .data
             .transfers
+            .as_ref()
+            .ok_or(anyhow!("No transfers found in response body"))?
             .iter()
             .map(|t| ContextData {
                 context: Cow::Borrowed(context),
@@ -158,9 +160,11 @@ mod tests {
 
         // Gen test data
         let mut resp: Response<TransfersPage> = Default::default();
-        resp.data.transfers = vec![Default::default(); 10];
+        resp.data.transfers = Some(vec![Default::default(); 10]);
         resp.data
             .transfers
+            .as_mut()
+            .unwrap()
             .iter_mut()
             .enumerate()
             .for_each(|(idx, t)| t.extrinsic_index = idx.to_string().into());
@@ -175,10 +179,12 @@ mod tests {
 
         // Gen new test data
         let mut new_resp: Response<TransfersPage> = Default::default();
-        new_resp.data.transfers = vec![Default::default(); 15];
+        new_resp.data.transfers = Some(vec![Default::default(); 15]);
         new_resp
             .data
             .transfers
+            .as_mut()
+            .unwrap()
             .iter_mut()
             .enumerate()
             .for_each(|(idx, t)| t.extrinsic_index = (idx + 10).to_string().into());

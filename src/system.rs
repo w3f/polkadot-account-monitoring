@@ -49,7 +49,11 @@ impl DataInfo for Response<TransfersPage> {
         <Self as DataInfo>::new_count(self) == 0
     }
     fn new_count(&self) -> usize {
-        self.data.transfers.len()
+        if let Some(transfers) = &self.data.transfers {
+            transfers.len()
+        } else {
+            0
+        }
     }
 }
 
@@ -92,6 +96,7 @@ impl ScrapingService {
                     loop {
                         // No new extrinsics were found, continue with next account.
                         if resp.is_empty() {
+                            debug!("No new transactions were found, moving on");
                             break;
                         }
                         // New extrinsics are all on one page. Insert those into the
@@ -140,12 +145,16 @@ impl ScrapingService {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tests::db;
+    use crate::tests::{db, init};
     use std::vec;
 
     #[tokio::test]
     #[ignore]
-    async fn live_run_fetcher() {
+    async fn live_run_transfer_fetcher() {
+        init();
+
+        info!("Running live test for transfer fetcher");
+
         let db = db().await;
 
         let contexts = vec![Context::from(

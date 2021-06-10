@@ -4,6 +4,8 @@ extern crate serde;
 extern crate async_trait;
 #[macro_use]
 extern crate log;
+#[macro_use]
+extern crate anyhow;
 
 use anyhow::Error;
 
@@ -37,11 +39,14 @@ impl Context {
 mod tests {
     use super::*;
     use crate::database::Database;
+    use log::LevelFilter;
     use rand::{thread_rng, Rng};
 
     /// Convenience function for logging in tests.
-    fn init() {
-        let _ = env_logger::builder().is_test(true).try_init();
+    pub fn init() {
+        let _ = env_logger::builder()
+            .filter_level(LevelFilter::Debug)
+            .init();
     }
 
     /// Convenience function for initiating test database.
