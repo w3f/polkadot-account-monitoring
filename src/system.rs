@@ -10,14 +10,17 @@ const INTERVAL_SECS: u64 = 5;
 const FAILED_TASK_SLEEP: u64 = 30;
 
 pub struct TransferFetcher {
-    api: ChainApi,
     db: Database,
+    api: Arc<ChainApi>,
 }
 
 #[async_trait]
 impl FetchChainData for TransferFetcher {
     type Data = Response<TransfersPage>;
 
+    fn new(db: Database, api: Arc<ChainApi>) -> Self {
+        TransferFetcher { db: db, api: api }
+    }
     async fn fetch_data(&self, context: &Context, row: usize, page: usize) -> Result<Self::Data> {
         self.api.request_extrinsics(context, row, page).await
     }
@@ -30,6 +33,7 @@ impl FetchChainData for TransferFetcher {
 pub trait FetchChainData {
     type Data: Send + Sync + DataInfo;
 
+    fn new(db: Database, api: Arc<ChainApi>) -> Self;
     async fn fetch_data(&self, _: &Context, row: usize, page: usize) -> Result<Self::Data>;
     async fn store_data(&self, _: &Context, data: &Self::Data) -> Result<usize>;
 }
@@ -66,11 +70,11 @@ impl ScrapingService {
     pub async fn add_contexts(&mut self, mut contexts: Vec<Context>) {
         self.contexts.write().await.append(&mut contexts);
     }
-    pub async fn run_fetcher<T>(&'static self, mut fetcher: T)
+    pub async fn run_fetcher<T>(&self)
     where
         T: 'static + Send + Sync + FetchChainData,
     {
-        async fn local<T>(fetcher: &T, contexts: Arc<RwLock<Vec<Context>>>) -> Result<()>
+        async fn local<T>(fetcher: &T, contexts: &Arc<RwLock<Vec<Context>>>) -> Result<()>
         where
             T: 'static + Send + Sync + FetchChainData,
         {
@@ -114,9 +118,11 @@ impl ScrapingService {
             }
         }
 
+        let fetcher = T::new(self.db.clone(), Arc::clone(&self.api));
+        let contexts = Arc::clone(&self.contexts);
         tokio::spawn(async move {
             loop {
-                if let Err(err) = local(&fetcher, Arc::clone(&self.contexts)).await {
+                if let Err(err) = local(&fetcher, &contexts).await {
                     error!("Failed task while running fetcher: {:?}", err);
                 }
 
@@ -124,13 +130,31 @@ impl ScrapingService {
             }
         });
     }
+    pub async fn wait_blocking(&self) {
+        loop {
+            sleep(Duration::from_secs(u64::MAX)).await;
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::tests::db;
+    use std::vec;
 
     #[tokio::test]
     #[ignore]
-    async fn live_run_fetcher() {}
+    async fn live_run_fetcher() {
+        let db = db().await;
+
+        let contexts = vec![Context::from(
+            "11uMPbeaEDJhUxzU4ZfWW9VQEsryP9XqFcNRfPdYda6aFWJ",
+        )];
+
+        let mut service = ScrapingService::new(db);
+        service.add_contexts(contexts).await;
+        service.run_fetcher::<TransferFetcher>().await;
+        service.wait_blocking().await;
+    }
 }

@@ -31,6 +31,7 @@ pub struct ContextData<'a, T: Clone> {
     data: Cow<'a, T>,
 }
 
+#[derive(Clone)]
 pub struct Database {
     db: MongoDb,
 }
@@ -83,7 +84,10 @@ impl Database {
                 .await?;
 
             assert_eq!(res.modified_count, 0);
-            res.upserted_id.map(|_| count += 1);
+            res.upserted_id.map(|_| {
+                info!("New transfer detected for {:?}: {:?}", context, extrinsic);
+                count += 1;
+            });
         }
 
         Ok(count)

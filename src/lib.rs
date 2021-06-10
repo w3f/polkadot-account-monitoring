@@ -55,6 +55,15 @@ mod tests {
         .unwrap()
     }
 
+    impl<'a> From<&'a str> for Context {
+        fn from(val: &'a str) -> Self {
+            Context {
+                stash: val.to_string(),
+                network: Network::Polkadot,
+            }
+        }
+    }
+
     impl Context {
         pub fn alice() -> Self {
             Context {
