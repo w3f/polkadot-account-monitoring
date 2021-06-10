@@ -125,3 +125,12 @@ impl ScrapingService {
         });
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    #[ignore]
+    async fn live_run_fetcher() {}
+}

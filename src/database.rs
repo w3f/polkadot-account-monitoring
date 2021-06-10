@@ -141,18 +141,12 @@ impl Database {
 mod tests {
     use super::*;
     use crate::chain_api::{Response, Transfer, TransfersPage};
+    use crate::tests::db;
     use crate::Context;
-    use rand::{thread_rng, Rng};
 
     #[tokio::test]
     async fn store_extrinsic_event() {
-        let random: u32 = thread_rng().gen_range(u32::MIN..u32::MAX);
-        let db = Database::new(
-            "mongodb://localhost:27017/",
-            &format!("monitoring_test_{}", random),
-        )
-        .await
-        .unwrap();
+        let db = db().await;
 
         // Must now have an influence on data.
         let alice = Context::alice();
@@ -200,13 +194,7 @@ mod tests {
 
     #[tokio::test]
     async fn store_reward_slash_event() {
-        let random: u32 = thread_rng().gen_range(u32::MIN..u32::MAX);
-        let db = Database::new(
-            "mongodb://localhost:27017/",
-            &format!("monitoring_test_{}", random),
-        )
-        .await
-        .unwrap();
+        let db = db().await;
 
         // Must now have an influence on data.
         let alice = Context::alice();

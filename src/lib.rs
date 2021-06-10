@@ -36,6 +36,24 @@ impl Context {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::database::Database;
+    use rand::{thread_rng, Rng};
+
+    /// Convenience function for logging in tests.
+    fn init() {
+        let _ = env_logger::builder().is_test(true).try_init();
+    }
+
+    /// Convenience function for initiating test database.
+    pub async fn db() -> Database {
+        let random: u32 = thread_rng().gen_range(u32::MIN..u32::MAX);
+        Database::new(
+            "mongodb://localhost:27017/",
+            &format!("monitoring_test_{}", random),
+        )
+        .await
+        .unwrap()
+    }
 
     impl Context {
         pub fn alice() -> Self {
