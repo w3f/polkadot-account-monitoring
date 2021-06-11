@@ -22,10 +22,10 @@ impl FetchChainData for TransferFetcher {
         TransferFetcher { db: db, api: api }
     }
     async fn fetch_data(&self, context: &Context, row: usize, page: usize) -> Result<Self::Data> {
-        self.api.request_extrinsics(context, row, page).await
+        self.api.request_transfer(context, row, page).await
     }
     async fn store_data(&self, context: &Context, data: &Self::Data) -> Result<usize> {
-        self.db.store_extrinsic_event(context, data).await
+        self.db.store_transfer_event(context, data).await
     }
 }
 

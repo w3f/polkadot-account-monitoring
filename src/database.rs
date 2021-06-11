@@ -42,7 +42,7 @@ impl Database {
             db: Client::with_uri_str(uri).await?.database(db),
         })
     }
-    pub async fn store_extrinsic_event(
+    pub async fn store_transfer_event(
         &self,
         context: &Context,
         data: &Response<TransfersPage>,
@@ -151,7 +151,7 @@ mod tests {
     use crate::Context;
 
     #[tokio::test]
-    async fn store_extrinsic_event() {
+    async fn store_transfer_event() {
         let db = db().await;
 
         // Must now have an influence on data.
@@ -170,11 +170,11 @@ mod tests {
             .for_each(|(idx, t)| t.extrinsic_index = idx.to_string().into());
 
         // New data is inserted
-        let count = db.store_extrinsic_event(&alice, &resp).await.unwrap();
+        let count = db.store_transfer_event(&alice, &resp).await.unwrap();
         assert_eq!(count, 10);
 
         // No new data is inserted
-        let count = db.store_extrinsic_event(&alice, &resp).await.unwrap();
+        let count = db.store_transfer_event(&alice, &resp).await.unwrap();
         assert_eq!(count, 0);
 
         // Gen new test data
@@ -190,15 +190,15 @@ mod tests {
             .for_each(|(idx, t)| t.extrinsic_index = (idx + 10).to_string().into());
 
         // New data is inserted
-        let count = db.store_extrinsic_event(&bob, &new_resp).await.unwrap();
+        let count = db.store_transfer_event(&bob, &new_resp).await.unwrap();
         assert_eq!(count, 15);
 
         // No new data is inserted
-        let count = db.store_extrinsic_event(&bob, &new_resp).await.unwrap();
+        let count = db.store_transfer_event(&bob, &new_resp).await.unwrap();
         assert_eq!(count, 0);
 
         // Insert previous data (under a new context)
-        let count = db.store_extrinsic_event(&bob, &resp).await.unwrap();
+        let count = db.store_transfer_event(&bob, &resp).await.unwrap();
         assert_eq!(count, 10);
     }
 

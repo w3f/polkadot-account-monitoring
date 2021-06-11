@@ -59,7 +59,7 @@ impl ChainApi {
             .await
             .map_err(|err| err.into())
     }
-    pub async fn request_extrinsics(
+    pub async fn request_transfer(
         &self,
         context: &Context,
         row: usize,
