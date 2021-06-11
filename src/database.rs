@@ -108,6 +108,8 @@ impl Database {
         let reward_slashes: Vec<ContextData<RewardSlash>> = data
             .data
             .list
+            .as_ref()
+            .ok_or(anyhow!("No rewards/slashes found in response body"))?
             .iter()
             .map(|rs| ContextData {
                 context: Cow::Borrowed(context),
@@ -212,9 +214,11 @@ mod tests {
 
         // Gen test data
         let mut resp: Response<RewardsSlashesPage> = Default::default();
-        resp.data.list = vec![Default::default(); 10];
+        resp.data.list = Some(vec![Default::default(); 10]);
         resp.data
             .list
+            .as_mut()
+            .unwrap()
             .iter_mut()
             .enumerate()
             .for_each(|(idx, e)| e.extrinsic_hash = idx.to_string().into());
@@ -229,10 +233,12 @@ mod tests {
 
         // Gen new test data
         let mut new_resp: Response<RewardsSlashesPage> = Default::default();
-        new_resp.data.list = vec![Default::default(); 15];
+        new_resp.data.list = Some(vec![Default::default(); 15]);
         new_resp
             .data
             .list
+            .as_mut()
+            .unwrap()
             .iter_mut()
             .enumerate()
             .for_each(|(idx, e)| e.extrinsic_hash = (idx + 10).to_string().into());

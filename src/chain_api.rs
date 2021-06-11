@@ -126,20 +126,31 @@ impl ChainApi {
             )
             .await?;
 
+        if resp.data.list.is_none() {
+            return Ok(resp);
+        }
+
         // Only keep unprocessed extrinsic hashes.
         {
             let cache = self.cache_extrinsics.read().await;
             resp.data
                 .list
+                .as_mut()
+                .unwrap()
                 .retain(|reward_slash| !cache.contains(&reward_slash.extrinsic_hash));
         }
 
         // Cache new extrinsic hashes.
         {
             let mut cache = self.cache_extrinsics.write().await;
-            resp.data.list.iter().for_each(|reward_slash| {
-                cache.insert(reward_slash.extrinsic_hash.clone());
-            });
+            resp.data
+                .list
+                .as_ref()
+                .unwrap()
+                .iter()
+                .for_each(|reward_slash| {
+                    cache.insert(reward_slash.extrinsic_hash.clone());
+                });
         }
 
         Ok(resp)
@@ -222,7 +233,7 @@ pub struct ExtrinsicHash(String);
 #[serde(rename_all = "snake_case")]
 pub struct RewardsSlashesPage {
     count: usize,
-    pub list: Vec<RewardSlash>,
+    pub list: Option<Vec<RewardSlash>>,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
