@@ -15,15 +15,27 @@ mod system;
 
 type Result<T> = std::result::Result<T, Error>;
 
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
+pub struct Config {
+    database: String,
+    modules: Vec<Module>,
+    accounts: Vec<Context>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum Module {
+    Transfer,
+    RewardsSlashes,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Context {
     stash: String,
     network: Network,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
 enum Network {
     Polkadot,
     Kusama,

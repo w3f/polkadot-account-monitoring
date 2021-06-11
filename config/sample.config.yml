@@ -1,0 +1,11 @@
+database: "mongodb://localhost:27017/"
+modules:
+  - transfer
+  - rewards_slashes
+accounts:
+  -
+    stash: "1a2YiGNu1UUhJtihq8961c7FZtWGQuWDVMWTNBKJdmpGhZP"
+    network: "polkadot"
+  -
+    stash: "1b3NhsSEqWSQwS6nPGKgCrSjv9Kp13CnhraLV5Coyd8ooXB"
+    network: "polkadot"
