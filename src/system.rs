@@ -96,7 +96,7 @@ impl ScrapingService {
                     loop {
                         // No new extrinsics were found, continue with next account.
                         if resp.is_empty() {
-                            debug!("No new transactions were found, moving on");
+                            debug!("No new transactions were found for {:?}, moving on...", context);
                             break;
                         }
                         // New extrinsics are all on one page. Insert those into the
