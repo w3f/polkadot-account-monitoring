@@ -1,4 +1,4 @@
-use crate::chain_api::{ChainApi, Response, TransfersPage};
+use crate::chain_api::{ChainApi, Response, RewardsSlashesPage, TransfersPage};
 use crate::database::Database;
 use crate::{Context, Result};
 use std::sync::Arc;
@@ -6,7 +6,6 @@ use tokio::sync::RwLock;
 use tokio::time::{interval, sleep, Duration};
 
 const ROW_AMOUNT: usize = 10;
-const INTERVAL_SECS: u64 = 5;
 const FAILED_TASK_SLEEP: u64 = 30;
 
 pub struct TransferFetcher {
@@ -29,9 +28,29 @@ impl FetchChainData for TransferFetcher {
     }
 }
 
+pub struct RewardsSlashesFetcher {
+    db: Database,
+    api: Arc<ChainApi>,
+}
+
+#[async_trait]
+impl FetchChainData for RewardsSlashesFetcher {
+    type Data = Response<RewardsSlashesPage>;
+
+    fn new(db: Database, api: Arc<ChainApi>) -> Self {
+        RewardsSlashesFetcher { db: db, api: api }
+    }
+    async fn fetch_data(&self, context: &Context, row: usize, page: usize) -> Result<Self::Data> {
+        self.api.request_reward_slash(context, row, page).await
+    }
+    async fn store_data(&self, context: &Context, data: &Self::Data) -> Result<usize> {
+        self.db.store_reward_slash_event(context, data).await
+    }
+}
+
 #[async_trait]
 pub trait FetchChainData {
-    type Data: Send + Sync + DataInfo;
+    type Data: Send + Sync + std::fmt::Debug + DataInfo;
 
     fn new(db: Database, api: Arc<ChainApi>) -> Self;
     async fn fetch_data(&self, _: &Context, row: usize, page: usize) -> Result<Self::Data>;
@@ -51,6 +70,20 @@ impl DataInfo for Response<TransfersPage> {
     fn new_count(&self) -> usize {
         if let Some(transfers) = &self.data.transfers {
             transfers.len()
+        } else {
+            0
+        }
+    }
+}
+
+#[async_trait]
+impl DataInfo for Response<RewardsSlashesPage> {
+    fn is_empty(&self) -> bool {
+        <Self as DataInfo>::new_count(self) == 0
+    }
+    fn new_count(&self) -> usize {
+        if let Some(rewards_slashes) = &self.data.list {
+            rewards_slashes.len()
         } else {
             0
         }
@@ -83,7 +116,6 @@ impl ScrapingService {
             T: 'static + Send + Sync + FetchChainData,
         {
             let mut page: usize = 1;
-            let mut interval = interval(Duration::from_secs(INTERVAL_SECS));
 
             loop {
                 // This `read()` can result in a quite long-running lock.
@@ -102,19 +134,23 @@ impl ScrapingService {
                             );
                             break;
                         }
-                        // New extrinsics are all on one page. Insert those into the
-                        // database and continue with the next account.
-                        else if resp.new_count() < ROW_AMOUNT {
-                            // The cache tries to filter all unprocessed extrinsics, but
-                            // the cache is not persistent and is wiped on application
-                            // shutdown. The database has a 'unique' constraint on
-                            // extrinsics hashes and this method will return how many
-                            // extrinsics have been *newly* inserted into the database.
-                            // If it's 0, then no new extrinsics were detected. Continue
-                            // with the next account.
-                            if fetcher.store_data(context, &resp).await? == 0 {
-                                break;
-                            }
+
+                        // The cache tries to filter all unprocessed extrinsics,
+                        // but the cache is not persisted and is wiped on
+                        // application shutdown. The database method will return
+                        // how many extrinsics have been *newly* inserted into
+                        // the database. If it's 0, then no new extrinsics were
+                        // detected. Continue with the next account.
+                        if fetcher.store_data(context, &resp).await? == 0 {
+                            break;
+                        }
+
+                        info!("New transactions found for {:?}: {:?}", context, resp);
+
+                        // If new extrinsics were all on one page, continue with
+                        // the next account. Otherwise, fetch the next page.
+                        if resp.new_count() < ROW_AMOUNT {
+                            break;
                         }
 
                         page += 1;
@@ -167,6 +203,25 @@ mod tests {
         let mut service = ScrapingService::new(db);
         service.add_contexts(contexts).await;
         service.run_fetcher::<TransferFetcher>().await;
+        service.wait_blocking().await;
+    }
+
+    #[tokio::test]
+    #[ignore]
+    async fn live_run_reward_slash_fetcher() {
+        init();
+
+        info!("Running live test for transfer fetcher");
+
+        let db = db().await;
+
+        let contexts = vec![Context::from(
+            "11uMPbeaEDJhUxzU4ZfWW9VQEsryP9XqFcNRfPdYda6aFWJ",
+        )];
+
+        let mut service = ScrapingService::new(db);
+        service.add_contexts(contexts).await;
+        service.run_fetcher::<RewardsSlashesFetcher>().await;
         service.wait_blocking().await;
     }
 }

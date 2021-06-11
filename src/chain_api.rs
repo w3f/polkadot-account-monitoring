@@ -108,7 +108,7 @@ impl ChainApi {
         Ok(resp)
     }
     pub async fn request_reward_slash(
-        &mut self,
+        &self,
         stash: &Context,
         row: usize,
         page: usize,
