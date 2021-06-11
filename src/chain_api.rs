@@ -1,4 +1,5 @@
 use crate::{Context, Result};
+use reqwest::header::{CONTENT_TYPE, USER_AGENT};
 use reqwest::Client;
 use serde::{de::DeserializeOwned, Serialize};
 use std::collections::HashSet;
@@ -39,8 +40,18 @@ impl ChainApi {
         T: Serialize,
         R: DeserializeOwned,
     {
+        let headers = [
+            ("X-API-Key".parse()?, "YOUR_KEY".parse()?),
+            (CONTENT_TYPE, "application/json".parse()?),
+            (USER_AGENT, "curl/7.68.0".parse()?),
+        ]
+        .iter()
+        .cloned()
+        .collect();
+
         self.client
             .post(url)
+            .headers(headers)
             .json(param)
             .send()
             .await?
@@ -71,14 +82,14 @@ impl ChainApi {
             return Ok(resp);
         }
 
-        // Only keep unprocessed extrinsic indexes .
+        // Only keep unprocessed extrinsic indexes.
         {
             let cache = self.cache_index.read().await;
             resp.data
                 .transfers
                 .as_mut()
                 .unwrap()
-                .retain(|transfer| cache.contains(&transfer.extrinsic_index));
+                .retain(|transfer| !cache.contains(&transfer.extrinsic_index));
         }
 
         // Cache new transfer hashes.
@@ -120,7 +131,7 @@ impl ChainApi {
             let cache = self.cache_extrinsics.read().await;
             resp.data
                 .list
-                .retain(|reward_slash| cache.contains(&reward_slash.extrinsic_hash));
+                .retain(|reward_slash| !cache.contains(&reward_slash.extrinsic_hash));
         }
 
         // Cache new extrinsic hashes.

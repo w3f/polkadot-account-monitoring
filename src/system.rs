@@ -5,7 +5,7 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 use tokio::time::{interval, sleep, Duration};
 
-const ROW_AMOUNT: usize = 25;
+const ROW_AMOUNT: usize = 10;
 const INTERVAL_SECS: u64 = 5;
 const FAILED_TASK_SLEEP: u64 = 30;
 
@@ -96,7 +96,10 @@ impl ScrapingService {
                     loop {
                         // No new extrinsics were found, continue with next account.
                         if resp.is_empty() {
-                            debug!("No new transactions were found for {:?}, moving on...", context);
+                            debug!(
+                                "No new transactions were found for {:?}, moving on...",
+                                context
+                            );
                             break;
                         }
                         // New extrinsics are all on one page. Insert those into the
