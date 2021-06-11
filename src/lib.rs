@@ -11,6 +11,7 @@ use anyhow::Error;
 use database::Database;
 use std::fs::read_to_string;
 use system::{Module, ScrapingService};
+use log::LevelFilter;
 
 mod chain_api;
 mod database;
@@ -22,6 +23,7 @@ pub type Result<T> = std::result::Result<T, Error>;
 struct Config {
     database: DatabaseConfig,
     modules: Vec<Module>,
+    log_level: LevelFilter,
     accounts: Vec<Context>,
 }
 
@@ -50,9 +52,14 @@ enum Network {
 }
 
 pub async fn run() -> Result<()> {
-    info!("Reading config from 'config/config.yml'");
+    println!("Reading config from 'config/config.yml'");
     let content = read_to_string("config/config.yml")?;
     let config: Config = serde_yaml::from_str(&content)?;
+
+    println!("Starting logger");
+    env_logger::builder()
+        .filter_level(config.log_level)
+        .init();
 
     info!("Setting up database");
     let db = Database::new(&config.database.uri, &config.database.name).await?;

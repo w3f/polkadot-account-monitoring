@@ -1,7 +1,10 @@
-database: "mongodb://localhost:27017/"
+database:
+  uri: "mongodb://localhost:27017/"
+  name: "monitor"
 modules:
   - transfer
   - rewards_slashes
+log_level: debug
 accounts:
   -
     stash: "1a2YiGNu1UUhJtihq8961c7FZtWGQuWDVMWTNBKJdmpGhZP"

@@ -6,8 +6,8 @@ use mongodb::{Client, Database as MongoDb};
 use serde::Serialize;
 use std::borrow::Cow;
 
-const EXTRINSIC_EVENTS_RAW: &'static str = "extrinsics_raw";
-const REWARD_SLASH_EVENTS_RAW: &'static str = "rewards_slashes_raw";
+const COLL_TRANSFER_RAW: &'static str = "raw_transfers";
+const COLL_REWARD_SLASH_RAW: &'static str = "raw_rewards_slashes";
 
 /// Convenience trait. Converts a value to BSON.
 trait ToBson {
@@ -49,7 +49,7 @@ impl Database {
     ) -> Result<usize> {
         let coll = self
             .db
-            .collection::<ContextData<Transfer>>(EXTRINSIC_EVENTS_RAW);
+            .collection::<ContextData<Transfer>>(COLL_TRANSFER_RAW);
 
         // Add the full context to each transfer, so the corresponding account
         // can be identified.
@@ -101,7 +101,7 @@ impl Database {
     ) -> Result<usize> {
         let coll = self
             .db
-            .collection::<ContextData<RewardSlash>>(REWARD_SLASH_EVENTS_RAW);
+            .collection::<ContextData<RewardSlash>>(COLL_REWARD_SLASH_RAW);
 
         // Add the full context to each transfer, so the corresponding account
         // can be identified.
