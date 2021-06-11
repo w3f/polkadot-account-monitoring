@@ -8,6 +8,10 @@ extern crate log;
 extern crate anyhow;
 
 use anyhow::Error;
+use database::Database;
+use std::collections::HashSet;
+use std::fs::read_to_string;
+use system::{Module, ScrapingService};
 
 mod chain_api;
 mod database;
@@ -15,18 +19,17 @@ mod system;
 
 type Result<T> = std::result::Result<T, Error>;
 
-
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct Config {
-    database: String,
+struct Config {
+    database: DatabaseConfig,
     modules: Vec<Module>,
     accounts: Vec<Context>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub enum Module {
-    Transfer,
-    RewardsSlashes,
+struct DatabaseConfig {
+    uri: String,
+    name: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -35,16 +38,45 @@ pub struct Context {
     network: Network,
 }
 
+impl Context {
+    pub fn as_str(&self) -> &str {
+        self.stash.as_str()
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 enum Network {
     Polkadot,
     Kusama,
 }
 
-impl Context {
-    pub fn as_str(&self) -> &str {
-        self.stash.as_str()
+pub async fn run() -> Result<()> {
+    info!("Reading config from 'config/config.yml'");
+    let content = read_to_string("config/config.yml")?;
+    let config: Config = serde_yaml::from_str(&content)?;
+
+    info!("Setting up database");
+    let db = Database::new(&config.database.uri, &config.database.name).await?;
+
+    info!("Setting up scraping service");
+    let mut service = ScrapingService::new(db);
+
+    let account_count = config.accounts.len();
+    if account_count == 0 {
+        return Err(anyhow!("no accounts were specified to monitor"));
+    } else {
+        info!("Adding {} accounts to monitor", account_count)
     }
+
+    service.add_contexts(config.accounts).await;
+
+    for module in &config.modules {
+        service.run(module);
+    }
+
+    service.wait_blocking().await;
+
+    Ok(())
 }
 
 #[cfg(test)]

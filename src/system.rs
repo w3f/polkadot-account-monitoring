@@ -1,6 +1,7 @@
 use crate::chain_api::{ChainApi, Response, RewardsSlashesPage, TransfersPage};
 use crate::database::Database;
 use crate::{Context, Result};
+use std::collections::HashSet;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tokio::time::{interval, sleep, Duration};
@@ -90,24 +91,47 @@ impl DataInfo for Response<RewardsSlashesPage> {
     }
 }
 
-pub struct ScrapingService {
+#[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
+pub enum Module {
+    Transfer,
+    RewardsSlashes,
+}
+
+pub struct ScrapingService<'a> {
     db: Database,
     api: Arc<ChainApi>,
     contexts: Arc<RwLock<Vec<Context>>>,
+    running: HashSet<&'a Module>,
 }
 
-impl ScrapingService {
+impl<'a> ScrapingService<'a> {
     pub fn new(db: Database) -> Self {
         ScrapingService {
             db: db,
             api: Arc::new(ChainApi::new()),
             contexts: Arc::new(RwLock::new(vec![])),
+            running: HashSet::new(),
         }
     }
     pub async fn add_contexts(&mut self, mut contexts: Vec<Context>) {
         self.contexts.write().await.append(&mut contexts);
     }
-    pub async fn run_fetcher<T>(&self)
+    pub async fn run(&mut self, module: &'a Module) -> Result<()> {
+        if self.running.contains(module) {
+            return Err(anyhow!(
+                "configuration contains the same module multiple times"
+            ));
+        }
+
+        self.running.insert(module);
+        match module {
+            Module::Transfer => self.run_fetcher::<TransferFetcher>().await,
+            Module::RewardsSlashes => self.run_fetcher::<RewardsSlashesFetcher>().await,
+        }
+
+        Ok(())
+    }
+    async fn run_fetcher<T>(&self)
     where
         T: 'static + Send + Sync + FetchChainData,
     {
