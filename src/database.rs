@@ -1,7 +1,7 @@
 use crate::chain_api::{Response, RewardSlash, RewardsSlashesPage, Transfer, TransfersPage};
 use crate::{Context, Result};
-use bson::{doc, from_document, to_bson, to_document, Bson, Document};
-use mongodb::options::{InsertManyOptions, UpdateOptions};
+use bson::{doc, to_bson, to_document, Bson, Document};
+use mongodb::options::UpdateOptions;
 use mongodb::{Client, Database as MongoDb};
 use serde::Serialize;
 use std::borrow::Cow;
@@ -148,7 +148,7 @@ impl Database {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::chain_api::{Response, Transfer, TransfersPage};
+    use crate::chain_api::{Response, TransfersPage};
     use crate::tests::db;
     use crate::Context;
 

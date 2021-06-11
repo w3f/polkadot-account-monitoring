@@ -9,7 +9,6 @@ extern crate anyhow;
 
 use anyhow::Error;
 use database::Database;
-use std::collections::HashSet;
 use std::fs::read_to_string;
 use system::{Module, ScrapingService};
 
@@ -17,7 +16,7 @@ mod chain_api;
 mod database;
 mod system;
 
-type Result<T> = std::result::Result<T, Error>;
+pub type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 struct Config {
@@ -71,7 +70,7 @@ pub async fn run() -> Result<()> {
     service.add_contexts(config.accounts).await;
 
     for module in &config.modules {
-        service.run(module);
+        service.run(module).await?;
     }
 
     service.wait_blocking().await;

@@ -4,10 +4,11 @@ use crate::{Context, Result};
 use std::collections::HashSet;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use tokio::time::{interval, sleep, Duration};
+use tokio::time::{sleep, Duration};
 
 const ROW_AMOUNT: usize = 10;
 const FAILED_TASK_SLEEP: u64 = 30;
+const LOOP_INTERVAL: u64 = 300;
 
 pub struct TransferFetcher {
     db: Database,
@@ -124,6 +125,7 @@ impl<'a> ScrapingService<'a> {
         }
 
         self.running.insert(module);
+
         match module {
             Module::Transfer => self.run_fetcher::<TransferFetcher>().await,
             Module::RewardsSlashes => self.run_fetcher::<RewardsSlashesFetcher>().await,
@@ -183,6 +185,11 @@ impl<'a> ScrapingService<'a> {
                     // Reset to page 1.
                     page = 1;
                 }
+
+                // Once all accounts have been processed, pause so other active
+                // fetchers are not blocked (by the time guard) from executing
+                // requests.
+                sleep(Duration::from_secs(LOOP_INTERVAL)).await;
             }
         }
 
