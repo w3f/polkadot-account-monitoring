@@ -50,6 +50,9 @@ impl Context {
             network: self.network,
         }
     }
+    pub fn network(&self) -> Network {
+        self.network
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -60,9 +63,18 @@ pub struct ContextId<'a> {
 
 #[derive(Debug, Copy, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-enum Network {
+pub enum Network {
     Polkadot,
     Kusama,
+}
+
+impl Network {
+    pub fn as_str(&self) -> &str {
+        match self {
+            Network::Polkadot => "polkadot",
+            Network::Kusama => "kusama",
+        }
+    }
 }
 
 pub async fn run() -> Result<()> {

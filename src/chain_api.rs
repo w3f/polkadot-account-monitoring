@@ -69,7 +69,10 @@ impl ChainApi {
 
         let mut resp: Response<TransfersPage> = self
             .post(
-                "https://polkadot.api.subscan.io/api/scan/transfers",
+                &format!(
+                    "https://{}.api.subscan.io/api/scan/transfers",
+                    context.network().as_str()
+                ),
                 &PageBody {
                     address: context.as_str(),
                     row: row,
@@ -109,7 +112,7 @@ impl ChainApi {
     }
     pub async fn request_reward_slash(
         &self,
-        stash: &Context,
+        context: &Context,
         row: usize,
         page: usize,
     ) -> Result<Response<RewardsSlashesPage>> {
@@ -117,9 +120,12 @@ impl ChainApi {
 
         let mut resp: Response<RewardsSlashesPage> = self
             .post(
-                "https://polkadot.api.subscan.io/api/scan/account/reward_slash",
+                &format!(
+                    "https://{}.api.subscan.io/api/scan/account/reward_slash",
+                    context.network().as_str()
+                ),
                 &PageBody {
-                    address: stash.as_str(),
+                    address: context.as_str(),
                     row: row,
                     page: page,
                 },
