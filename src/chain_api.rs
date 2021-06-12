@@ -238,7 +238,7 @@ pub struct ExtrinsicHash(String);
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub struct RewardsSlashesPage {
-    count: usize,
+    count: i64,
     pub list: Option<Vec<RewardSlash>>,
 }
 
