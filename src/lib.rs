@@ -7,15 +7,15 @@ extern crate log;
 #[macro_use]
 extern crate anyhow;
 
+use self::core::{Module, ScrapingService};
 use anyhow::Error;
 use database::Database;
 use log::LevelFilter;
 use std::{borrow::Cow, fs::read_to_string};
-use system::{Module, ScrapingService};
 
 mod chain_api;
+mod core;
 mod database;
-mod system;
 
 pub type Result<T> = std::result::Result<T, Error>;
 
@@ -71,7 +71,9 @@ pub async fn run() -> Result<()> {
     let config: Config = serde_yaml::from_str(&content)?;
 
     println!("Starting logger");
-    env_logger::builder().filter_level(config.log_level).init();
+    env_logger::builder()
+        .filter_module("system", config.log_level)
+        .init();
 
     info!("Reading accounts file");
     let content = read_to_string(config.accounts_file)?;
