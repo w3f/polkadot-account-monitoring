@@ -145,7 +145,7 @@ impl<'a> ScrapingService<'a> {
                     loop {
                         let resp = fetcher.fetch_data(context, ROW_AMOUNT, page).await?;
 
-                        // No new extrinsics were found, continue with next account.
+                        // No entires were found, continue with next account.
                         if resp.is_empty() {
                             debug!(
                                 "{}: No new entries were found for {:?}, moving on...",
