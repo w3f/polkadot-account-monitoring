@@ -10,7 +10,7 @@ extern crate anyhow;
 use anyhow::Error;
 use database::Database;
 use log::LevelFilter;
-use std::fs::read_to_string;
+use std::{borrow::Cow, fs::read_to_string};
 use system::{Module, ScrapingService};
 
 mod chain_api;
@@ -44,9 +44,21 @@ impl Context {
     pub fn as_str(&self) -> &str {
         self.stash.as_str()
     }
+    pub fn id<'a>(&'a self) -> ContextId<'a> {
+        ContextId {
+            stash: Cow::Borrowed(&self.stash),
+            network: self.network,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ContextId<'a> {
+    stash: Cow<'a, String>,
+    network: Network,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 enum Network {
     Polkadot,

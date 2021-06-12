@@ -1,5 +1,5 @@
 use crate::chain_api::{Response, RewardSlash, RewardsSlashesPage, Transfer, TransfersPage};
-use crate::{Context, Result};
+use crate::{Context, ContextId, Result};
 use bson::{doc, to_bson, to_document, Bson, Document};
 use mongodb::options::UpdateOptions;
 use mongodb::{Client, Database as MongoDb};
@@ -27,7 +27,7 @@ impl<T: Serialize> ToBson for T {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub struct ContextData<'a, T: Clone> {
-    context: Cow<'a, Context>,
+    context_id: ContextId<'a>,
     data: Cow<'a, T>,
 }
 
@@ -60,7 +60,7 @@ impl Database {
             .ok_or(anyhow!("No transfers found in response body"))?
             .iter()
             .map(|t| ContextData {
-                context: Cow::Borrowed(context),
+                context_id: context.id(),
                 data: Cow::Borrowed(t),
             })
             .collect();
@@ -71,7 +71,7 @@ impl Database {
             let res = coll
                 .update_one(
                     doc! {
-                        "context": context.to_bson()?,
+                        "context_id": context.id().to_bson()?,
                         "data.extrinsic_index": extrinsic.data.extrinsic_index.to_bson()?,
                     },
                     doc! {
@@ -116,7 +116,7 @@ impl Database {
             .ok_or(anyhow!("No rewards/slashes found in response body"))?
             .iter()
             .map(|rs| ContextData {
-                context: Cow::Borrowed(context),
+                context_id: context.id(),
                 data: Cow::Borrowed(rs),
             })
             .collect();
@@ -127,7 +127,7 @@ impl Database {
             let res = coll
                 .update_one(
                     doc! {
-                        "context": context.to_bson()?,
+                        "context_id": context.id().to_bson()?,
                         "data.extrinsic_hash": reward_slash.data.extrinsic_hash.to_bson()?,
                     },
                     doc! {

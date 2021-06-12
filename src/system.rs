@@ -184,7 +184,12 @@ impl<'a> ScrapingService<'a> {
                             break;
                         }
 
-                        info!("{} new entries found for {:?}", resp.new_count(), context);
+                        info!(
+                            "{}: {} new entries found for {:?}",
+                            fetcher.name(),
+                            resp.new_count(),
+                            context
+                        );
 
                         // If new extrinsics were all on one page, continue with
                         // the next account. Otherwise, fetch the next page.
