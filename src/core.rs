@@ -68,34 +68,19 @@ pub trait FetchChainData {
 
 pub trait DataInfo {
     fn is_empty(&self) -> bool;
-    fn new_count(&self) -> usize;
 }
 
 #[async_trait]
 impl DataInfo for Response<TransfersPage> {
     fn is_empty(&self) -> bool {
-        <Self as DataInfo>::new_count(self) == 0
-    }
-    fn new_count(&self) -> usize {
-        if let Some(transfers) = &self.data.transfers {
-            transfers.len()
-        } else {
-            0
-        }
+        self.data.transfers.is_none()
     }
 }
 
 #[async_trait]
 impl DataInfo for Response<RewardsSlashesPage> {
     fn is_empty(&self) -> bool {
-        <Self as DataInfo>::new_count(self) == 0
-    }
-    fn new_count(&self) -> usize {
-        if let Some(rewards_slashes) = &self.data.list {
-            rewards_slashes.len()
-        } else {
-            0
-        }
+        self.data.list.is_none()
     }
 }
 
@@ -176,7 +161,8 @@ impl<'a> ScrapingService<'a> {
                         // how many extrinsics have been *newly* inserted into
                         // the database. If it's 0, then no new extrinsics were
                         // detected. Continue with the next account.
-                        if fetcher.store_data(context, &resp).await? == 0 {
+                        let newly_inserted = fetcher.store_data(context, &resp).await?;
+                        if newly_inserted == 0 {
                             debug!(
                                 "{}: No new entries were found for {:?}, moving on...",
                                 fetcher.name(),
@@ -188,13 +174,13 @@ impl<'a> ScrapingService<'a> {
                         info!(
                             "{}: {} new entries found for {:?}",
                             fetcher.name(),
-                            resp.new_count(),
+                            newly_inserted,
                             context
                         );
 
                         // If new extrinsics were all on one page, continue with
                         // the next account. Otherwise, fetch the next page.
-                        if resp.new_count() < ROW_AMOUNT {
+                        if newly_inserted < ROW_AMOUNT {
                             debug!(
                                 "{}: All new entries have been fetched for {:?}, \
                             continuing with the next accounts.",

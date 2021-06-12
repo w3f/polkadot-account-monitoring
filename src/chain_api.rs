@@ -2,17 +2,14 @@ use crate::{Context, Result};
 use reqwest::header::{CONTENT_TYPE, USER_AGENT};
 use reqwest::Client;
 use serde::{de::DeserializeOwned, Serialize};
-use std::collections::HashSet;
 use std::sync::Arc;
-use tokio::sync::{Mutex, RwLock};
+use tokio::sync::Mutex;
 use tokio::time::{sleep, Duration};
 
 const REQUEST_TIMEOUT: u64 = 5;
 
 pub struct ChainApi {
     client: Client,
-    cache_extrinsics: Arc<RwLock<HashSet<ExtrinsicHash>>>,
-    cache_index: Arc<RwLock<HashSet<ExtrinsicIndex>>>,
     guard_lock: Arc<Mutex<()>>,
 }
 
@@ -20,8 +17,6 @@ impl ChainApi {
     pub fn new() -> Self {
         ChainApi {
             client: Client::new(),
-            cache_extrinsics: Arc::new(RwLock::new(HashSet::new())),
-            cache_index: Arc::new(RwLock::new(HashSet::new())),
             guard_lock: Arc::new(Mutex::new(())),
         }
     }
@@ -67,7 +62,7 @@ impl ChainApi {
     ) -> Result<Response<TransfersPage>> {
         self.time_guard().await;
 
-        let mut resp: Response<TransfersPage> = self
+        let resp: Response<TransfersPage> = self
             .post(
                 &format!(
                     "https://{}.api.subscan.io/api/scan/transfers",
@@ -81,33 +76,6 @@ impl ChainApi {
             )
             .await?;
 
-        if resp.data.transfers.is_none() {
-            return Ok(resp);
-        }
-
-        // Only keep unprocessed extrinsic indexes.
-        {
-            let cache = self.cache_index.read().await;
-            resp.data
-                .transfers
-                .as_mut()
-                .unwrap()
-                .retain(|transfer| !cache.contains(&transfer.extrinsic_index));
-        }
-
-        // Cache new transfer hashes.
-        {
-            let mut cache = self.cache_index.write().await;
-            resp.data
-                .transfers
-                .as_ref()
-                .unwrap()
-                .iter()
-                .for_each(|transfer| {
-                    cache.insert(transfer.extrinsic_index.clone());
-                });
-        }
-
         Ok(resp)
     }
     pub async fn request_reward_slash(
@@ -118,7 +86,7 @@ impl ChainApi {
     ) -> Result<Response<RewardsSlashesPage>> {
         self.time_guard().await;
 
-        let mut resp: Response<RewardsSlashesPage> = self
+        let resp: Response<RewardsSlashesPage> = self
             .post(
                 &format!(
                     "https://{}.api.subscan.io/api/scan/account/reward_slash",
@@ -131,33 +99,6 @@ impl ChainApi {
                 },
             )
             .await?;
-
-        if resp.data.list.is_none() {
-            return Ok(resp);
-        }
-
-        // Only keep unprocessed extrinsic hashes.
-        {
-            let cache = self.cache_extrinsics.read().await;
-            resp.data
-                .list
-                .as_mut()
-                .unwrap()
-                .retain(|reward_slash| !cache.contains(&reward_slash.extrinsic_hash));
-        }
-
-        // Cache new extrinsic hashes.
-        {
-            let mut cache = self.cache_extrinsics.write().await;
-            resp.data
-                .list
-                .as_ref()
-                .unwrap()
-                .iter()
-                .for_each(|reward_slash| {
-                    cache.insert(reward_slash.extrinsic_hash.clone());
-                });
-        }
 
         Ok(resp)
     }
