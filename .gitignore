@@ -1,2 +1,4 @@
-/target
 Cargo.lock
+target
+config/config.yml
+config/accounts.yml
