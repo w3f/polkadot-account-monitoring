@@ -19,6 +19,9 @@ pub struct TransferFetcher {
 impl FetchChainData for TransferFetcher {
     type Data = Response<TransfersPage>;
 
+    fn name(&self) -> &'static str {
+        "TransferFetcher"
+    }
     fn new(db: Database, api: Arc<ChainApi>) -> Self {
         TransferFetcher { db: db, api: api }
     }
@@ -39,6 +42,9 @@ pub struct RewardsSlashesFetcher {
 impl FetchChainData for RewardsSlashesFetcher {
     type Data = Response<RewardsSlashesPage>;
 
+    fn name(&self) -> &'static str {
+        "RewardsSlashesFetcher"
+    }
     fn new(db: Database, api: Arc<ChainApi>) -> Self {
         RewardsSlashesFetcher { db: db, api: api }
     }
@@ -54,6 +60,7 @@ impl FetchChainData for RewardsSlashesFetcher {
 pub trait FetchChainData {
     type Data: Send + Sync + std::fmt::Debug + DataInfo;
 
+    fn name(&self) -> &'static str;
     fn new(db: Database, api: Arc<ChainApi>) -> Self;
     async fn fetch_data(&self, _: &Context, row: usize, page: usize) -> Result<Self::Data>;
     async fn store_data(&self, _: &Context, data: &Self::Data) -> Result<usize>;
@@ -149,13 +156,14 @@ impl<'a> ScrapingService<'a> {
                 // called after a fetcher is running, since those are loaded on
                 // application startup.
                 for context in contexts.read().await.iter() {
-                    let resp = fetcher.fetch_data(context, ROW_AMOUNT, page).await?;
-
                     loop {
+                        let resp = fetcher.fetch_data(context, ROW_AMOUNT, page).await?;
+
                         // No new extrinsics were found, continue with next account.
                         if resp.is_empty() {
                             debug!(
-                                "No new transactions were found for {:?}, moving on...",
+                                "{}: No new entries were found for {:?}, moving on...",
+                                fetcher.name(),
                                 context
                             );
                             break;
@@ -168,14 +176,25 @@ impl<'a> ScrapingService<'a> {
                         // the database. If it's 0, then no new extrinsics were
                         // detected. Continue with the next account.
                         if fetcher.store_data(context, &resp).await? == 0 {
+                            debug!(
+                                "{}: No new entries were found for {:?}, moving on...",
+                                fetcher.name(),
+                                context
+                            );
                             break;
                         }
 
-                        info!("New transactions found for {:?}: {:?}", context, resp);
+                        info!("{} new entries found for {:?}", resp.new_count(), context);
 
                         // If new extrinsics were all on one page, continue with
                         // the next account. Otherwise, fetch the next page.
                         if resp.new_count() < ROW_AMOUNT {
+                            debug!(
+                                "{}: All new entries have been fetched for {:?}, \
+                            continuing with the next accounts.",
+                                fetcher.name(),
+                                context
+                            );
                             break;
                         }
 
@@ -198,7 +217,11 @@ impl<'a> ScrapingService<'a> {
         tokio::spawn(async move {
             loop {
                 if let Err(err) = local(&fetcher, &contexts).await {
-                    error!("Failed task while running fetcher: {:?}", err);
+                    error!(
+                        "Failed task while running fetcher '{}': {:?}",
+                        fetcher.name(),
+                        err
+                    );
                 }
 
                 sleep(Duration::from_secs(FAILED_TASK_SLEEP)).await;
