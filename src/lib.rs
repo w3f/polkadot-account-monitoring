@@ -9,9 +9,9 @@ extern crate anyhow;
 
 use anyhow::Error;
 use database::Database;
+use log::LevelFilter;
 use std::fs::read_to_string;
 use system::{Module, ScrapingService};
-use log::LevelFilter;
 
 mod chain_api;
 mod database;
@@ -22,7 +22,7 @@ pub type Result<T> = std::result::Result<T, Error>;
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 struct Config {
     database: DatabaseConfig,
-    modules: Vec<Module>,
+    active_modules: Vec<Module>,
     log_level: LevelFilter,
     accounts: Vec<Context>,
 }
@@ -37,6 +37,7 @@ struct DatabaseConfig {
 pub struct Context {
     stash: String,
     network: Network,
+    description: String,
 }
 
 impl Context {
@@ -57,9 +58,7 @@ pub async fn run() -> Result<()> {
     let config: Config = serde_yaml::from_str(&content)?;
 
     println!("Starting logger");
-    env_logger::builder()
-        .filter_level(config.log_level)
-        .init();
+    env_logger::builder().filter_level(config.log_level).init();
 
     info!("Setting up database");
     let db = Database::new(&config.database.uri, &config.database.name).await?;
@@ -76,7 +75,7 @@ pub async fn run() -> Result<()> {
 
     service.add_contexts(config.accounts).await;
 
-    for module in &config.modules {
+    for module in &config.active_modules {
         service.run(module).await?;
     }
 
@@ -115,6 +114,7 @@ mod tests {
             Context {
                 stash: val.to_string(),
                 network: Network::Polkadot,
+                description: "".to_string(),
             }
         }
     }
@@ -124,19 +124,44 @@ mod tests {
             Context {
                 stash: "1a2YiGNu1UUhJtihq8961c7FZtWGQuWDVMWTNBKJdmpGhZP".to_string(),
                 network: Network::Polkadot,
+                description: "".to_string(),
             }
         }
         pub fn bob() -> Self {
             Context {
                 stash: "1b3NhsSEqWSQwS6nPGKgCrSjv9Kp13CnhraLV5Coyd8ooXB".to_string(),
                 network: Network::Polkadot,
+                description: "".to_string(),
             }
         }
         pub fn eve() -> Self {
             Context {
                 stash: "1cNyFSmLW4ofr7xh38za6JxLFxcu548LPcfc1E6L9r57SE3".to_string(),
                 network: Network::Polkadot,
+                description: "".to_string(),
             }
         }
+    }
+}
+
+#[test]
+#[ignore]
+fn parse_file() {
+    let descs = read_to_string("descs.txt").unwrap();
+    let addrs = read_to_string("addrs.txt").unwrap();
+
+    let descs = descs.lines().into_iter();
+    let addrs = addrs.lines().into_iter();
+
+    for (desc, addr) in descs.zip(addrs) {
+        println!(
+            "{}",
+            serde_yaml::to_string(&vec![Context {
+                stash: addr.into(),
+                network: Network::Kusama,
+                description: format!("{}", desc),
+            }])
+            .unwrap()
+        )
     }
 }
