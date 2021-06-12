@@ -100,6 +100,7 @@ impl DataInfo for Response<RewardsSlashesPage> {
 }
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum Module {
     Transfer,
     RewardsSlashes,
