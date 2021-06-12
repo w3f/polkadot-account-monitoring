@@ -1,14 +1,7 @@
 database:
   uri: "mongodb://localhost:27017/"
   name: "monitor"
-modules:
+active_modules:
   - transfer
   - rewards_slashes
 log_level: debug
-accounts:
-  -
-    stash: "1a2YiGNu1UUhJtihq8961c7FZtWGQuWDVMWTNBKJdmpGhZP"
-    network: "polkadot"
-  -
-    stash: "1b3NhsSEqWSQwS6nPGKgCrSjv9Kp13CnhraLV5Coyd8ooXB"
-    network: "polkadot"
