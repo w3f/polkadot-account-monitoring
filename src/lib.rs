@@ -24,7 +24,7 @@ struct Config {
     database: DatabaseConfig,
     active_modules: Vec<Module>,
     log_level: LevelFilter,
-    accounts: Vec<Context>,
+    accounts_file: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -60,20 +60,24 @@ pub async fn run() -> Result<()> {
     println!("Starting logger");
     env_logger::builder().filter_level(config.log_level).init();
 
+    info!("Reading accounts file");
+    let content = read_to_string(config.accounts_file)?;
+    let accounts: Vec<Context> = serde_yaml::from_str(&content)?;
+
     info!("Setting up database");
     let db = Database::new(&config.database.uri, &config.database.name).await?;
 
     info!("Setting up scraping service");
     let mut service = ScrapingService::new(db);
 
-    let account_count = config.accounts.len();
+    let account_count = accounts.len();
     if account_count == 0 {
         return Err(anyhow!("no accounts were specified to monitor"));
     } else {
         info!("Adding {} accounts to monitor", account_count)
     }
 
-    service.add_contexts(config.accounts).await;
+    service.add_contexts(accounts).await;
 
     for module in &config.active_modules {
         service.run(module).await?;
