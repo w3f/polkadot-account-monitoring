@@ -25,6 +25,7 @@ serde_yaml = "0.8.17"
 mongodb = { version = "2.0.0-beta.1", features = ["bson-u2i"] }
 bson = "2.0.0-beta.1"
 async-trait = "0.1.50"
+futures = "0.3.15"
 
 [dev-dependencies]
 rand = "0.8.3"

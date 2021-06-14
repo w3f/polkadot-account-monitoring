@@ -2,7 +2,8 @@ use crate::chain_api::{
     NominationsPage, Response, RewardSlash, RewardsSlashesPage, Transfer, TransfersPage, Validator,
 };
 use crate::{Context, ContextId, Result};
-use bson::{doc, to_bson, to_document, Bson, Document};
+use bson::{doc, from_document, to_bson, to_document, Bson, Document};
+use futures::StreamExt;
 use mongodb::options::UpdateOptions;
 use mongodb::{Client, Database as MongoDb};
 use serde::Serialize;
@@ -212,6 +213,42 @@ impl Database {
         }
 
         Ok(count)
+    }
+}
+
+#[derive(Clone)]
+pub struct ReportGenerator {
+    db: MongoDb,
+}
+
+impl ReportGenerator {
+    pub async fn new(uri: &str, db: &str) -> Result<Self> {
+        Ok(ReportGenerator {
+            db: Client::with_uri_str(uri).await?.database(db),
+        })
+    }
+    pub async fn fetch_transfers<'a>(
+        &self,
+        contexts: &[Context],
+        from: u64,
+        to: u64,
+    ) -> Result<Vec<ContextData<'a, Transfer>>> {
+        let coll = self
+            .db
+            .collection::<ContextData<Transfer>>(COLL_TRANSFER_RAW);
+
+        let mut cursor = coll.find(doc!{
+            "context_id": {
+                "$in": contexts.iter().map(|c| c.as_str()).collect::<Vec<&str>>().to_bson()?,
+            }
+        }, None).await?;
+
+        let mut transfers: Vec<ContextData<Transfer>> = vec![];
+        while let Some(doc) = cursor.next().await {
+            transfers.push(doc?);
+        }
+
+        Ok(transfers)
     }
 }
 
