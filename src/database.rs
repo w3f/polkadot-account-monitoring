@@ -280,12 +280,33 @@ impl ReportGenerator {
             }
         }, None).await?;
 
-        let mut rewards_slashes  = vec![];
+        let mut rewards_slashes = vec![];
         while let Some(doc) = cursor.next().await {
             rewards_slashes.push(doc?);
         }
 
         Ok(rewards_slashes)
+    }
+    pub async fn fetch_nominations<'a>(
+        &self,
+        contexts: &[Context],
+    ) -> Result<Vec<ContextData<'a, Validator>>> {
+        let coll = self
+            .db
+            .collection::<ContextData<Validator>>(COLL_NOMINATIONS_RAW);
+
+        let mut cursor = coll.find(doc!{
+            "context_id": {
+                "$in": contexts.iter().map(|c| c.as_str()).collect::<Vec<&str>>().to_bson()?,
+            },
+        }, None).await?;
+
+        let mut validators = vec![];
+        while let Some(doc) = cursor.next().await {
+            validators.push(doc?);
+        }
+
+        Ok(validators)
     }
 }
 
