@@ -2,7 +2,7 @@ use crate::chain_api::{
     NominationsPage, Response, RewardSlash, RewardsSlashesPage, Transfer, TransfersPage, Validator,
 };
 use crate::{Context, ContextId, Result};
-use bson::{doc, from_document, to_bson, to_document, Bson, Document};
+use bson::{doc, to_bson, to_document, Bson, Document};
 use futures::StreamExt;
 use mongodb::options::UpdateOptions;
 use mongodb::{Client, Database as MongoDb};
@@ -230,6 +230,7 @@ impl ReportGenerator {
     pub async fn fetch_transfers<'a>(
         &self,
         contexts: &[Context],
+        // TODO: Add types-safety for timestamp
         from: u64,
         to: u64,
     ) -> Result<Vec<ContextData<'a, Transfer>>> {
@@ -249,12 +250,42 @@ impl ReportGenerator {
             }
         }, None).await?;
 
-        let mut transfers: Vec<ContextData<Transfer>> = vec![];
+        let mut transfers = vec![];
         while let Some(doc) = cursor.next().await {
             transfers.push(doc?);
         }
 
         Ok(transfers)
+    }
+    pub async fn fetch_rewards_slashes<'a>(
+        &self,
+        contexts: &[Context],
+        // TODO: Add types-safety for **block number**
+        from: u64,
+        to: u64,
+    ) -> Result<Vec<ContextData<'a, RewardSlash>>> {
+        let coll = self
+            .db
+            .collection::<ContextData<RewardSlash>>(COLL_REWARD_SLASH_RAW);
+
+        let mut cursor = coll.find(doc!{
+            "context_id": {
+                "$in": contexts.iter().map(|c| c.as_str()).collect::<Vec<&str>>().to_bson()?,
+            },
+            "data.block_num": {
+                "$gt": from.to_bson()?
+            },
+            "data.block_num": {
+                "$lt": to.to_bson()?
+            }
+        }, None).await?;
+
+        let mut rewards_slashes  = vec![];
+        while let Some(doc) = cursor.next().await {
+            rewards_slashes.push(doc?);
+        }
+
+        Ok(rewards_slashes)
     }
 }
 
