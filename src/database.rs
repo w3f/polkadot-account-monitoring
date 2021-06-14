@@ -240,6 +240,12 @@ impl ReportGenerator {
         let mut cursor = coll.find(doc!{
             "context_id": {
                 "$in": contexts.iter().map(|c| c.as_str()).collect::<Vec<&str>>().to_bson()?,
+            },
+            "data.block_timestamp": {
+                "$gt": from.to_bson()?
+            },
+            "data.block_timestamp": {
+                "$lt": to.to_bson()?
             }
         }, None).await?;
 
