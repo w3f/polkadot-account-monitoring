@@ -1,4 +1,4 @@
-use crate::chain_api::{ChainApi, Response, RewardsSlashesPage, TransfersPage};
+use crate::chain_api::{ChainApi, NominationsPage, Response, RewardsSlashesPage, TransfersPage};
 use crate::database::Database;
 use crate::{Context, Result};
 use std::collections::HashSet;
@@ -56,6 +56,29 @@ impl FetchChainData for RewardsSlashesFetcher {
     }
 }
 
+pub struct NominationsFetcher {
+    db: Database,
+    api: Arc<ChainApi>,
+}
+
+#[async_trait]
+impl FetchChainData for NominationsFetcher {
+    type Data = Response<NominationsPage>;
+
+    fn name(&self) -> &'static str {
+        "NominationsFetcher"
+    }
+    fn new(db: Database, api: Arc<ChainApi>) -> Self {
+        NominationsFetcher { db: db, api: api }
+    }
+    async fn fetch_data(&self, context: &Context, row: usize, page: usize) -> Result<Self::Data> {
+        self.api.request_nominations(context, row, page).await
+    }
+    async fn store_data(&self, context: &Context, data: &Self::Data) -> Result<usize> {
+        self.db.store_nomination_event(context, data).await
+    }
+}
+
 #[async_trait]
 pub trait FetchChainData {
     type Data: Send + Sync + std::fmt::Debug + DataInfo;
@@ -84,11 +107,19 @@ impl DataInfo for Response<RewardsSlashesPage> {
     }
 }
 
+#[async_trait]
+impl DataInfo for Response<NominationsPage> {
+    fn is_empty(&self) -> bool {
+        self.data.list.is_none()
+    }
+}
+
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Module {
     Transfer,
     RewardsSlashes,
+    Nominations,
 }
 
 pub struct ScrapingService<'a> {
@@ -122,6 +153,7 @@ impl<'a> ScrapingService<'a> {
         match module {
             Module::Transfer => self.run_fetcher::<TransferFetcher>().await,
             Module::RewardsSlashes => self.run_fetcher::<RewardsSlashesFetcher>().await,
+            Module::Nominations => self.run_fetcher::<NominationsFetcher>().await,
         }
 
         Ok(())

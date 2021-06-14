@@ -44,6 +44,8 @@ impl ChainApi {
         .cloned()
         .collect();
 
+        self.time_guard().await;
+
         self.client
             .post(url)
             .headers(headers)
@@ -60,9 +62,7 @@ impl ChainApi {
         row: usize,
         page: usize,
     ) -> Result<Response<TransfersPage>> {
-        self.time_guard().await;
-
-        let resp: Response<TransfersPage> = self
+        Ok(self
             .post(
                 &format!(
                     "https://{}.api.subscan.io/api/scan/transfers",
@@ -74,9 +74,7 @@ impl ChainApi {
                     page: page,
                 },
             )
-            .await?;
-
-        Ok(resp)
+            .await?)
     }
     pub async fn request_reward_slash(
         &self,
@@ -84,9 +82,7 @@ impl ChainApi {
         row: usize,
         page: usize,
     ) -> Result<Response<RewardsSlashesPage>> {
-        self.time_guard().await;
-
-        let resp: Response<RewardsSlashesPage> = self
+        Ok(self
             .post(
                 &format!(
                     "https://{}.api.subscan.io/api/scan/account/reward_slash",
@@ -98,9 +94,27 @@ impl ChainApi {
                     page: page,
                 },
             )
-            .await?;
-
-        Ok(resp)
+            .await?)
+    }
+    pub async fn request_nominations(
+        &self,
+        context: &Context,
+        row: usize,
+        page: usize,
+    ) -> Result<Response<NominationsPage>> {
+        Ok(self
+            .post(
+                &format!(
+                    "https://{}.api.subscan.io/api/scan/staking/nominators",
+                    context.network().as_str()
+                ),
+                &PageBody {
+                    address: context.as_str(),
+                    row: row,
+                    page: page,
+                },
+            )
+            .await?)
     }
 }
 
@@ -168,6 +182,24 @@ pub struct Parent {
     pub display: String,
     pub sub_symbol: String,
     pub identity: bool,
+}
+
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct NominationsPage {
+    pub count: i64,
+    pub list: Option<Vec<Validator>>,
+}
+
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Validator {
+    pub rank_validator: i64,
+    pub nickname: String,
+    pub validator_stash: String,
+    pub validator_controller: String,
+    pub bonded_nominators: String,
+    pub bonded_owner: String,
+    pub count_nominators: i64,
+    pub validator_prefs_value: i64,
 }
 
 #[derive(Default, Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]

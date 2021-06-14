@@ -1,4 +1,6 @@
-use crate::chain_api::{Response, RewardSlash, RewardsSlashesPage, Transfer, TransfersPage};
+use crate::chain_api::{
+    NominationsPage, Response, RewardSlash, RewardsSlashesPage, Transfer, TransfersPage, Validator,
+};
 use crate::{Context, ContextId, Result};
 use bson::{doc, to_bson, to_document, Bson, Document};
 use mongodb::options::UpdateOptions;
@@ -8,6 +10,7 @@ use std::borrow::Cow;
 
 const COLL_TRANSFER_RAW: &'static str = "raw_transfers";
 const COLL_REWARD_SLASH_RAW: &'static str = "raw_rewards_slashes";
+const COLL_NOMINATIONS_RAW: &'static str = "raw_rewards_slashes";
 
 /// Convenience trait. Converts a value to BSON.
 trait ToBson {
@@ -65,7 +68,7 @@ impl Database {
             })
             .collect();
 
-        // Insert new events. Return count of how many were newly inserted.
+        // Insert new entries. Return count of how many were newly inserted.
         let mut count = 0;
         for extrinsic in &extrinsics {
             let res = coll
@@ -107,7 +110,7 @@ impl Database {
             .db
             .collection::<ContextData<RewardSlash>>(COLL_REWARD_SLASH_RAW);
 
-        // Add the full context to each transfer, so the corresponding account
+        // Add the full context to each entry, so the corresponding account
         // can be identified.
         let reward_slashes: Vec<ContextData<RewardSlash>> = data
             .data
@@ -121,7 +124,7 @@ impl Database {
             })
             .collect();
 
-        // Insert new events. Return count of how many were newly inserted.
+        // Insert new entries. Return count of how many were newly inserted.
         let mut count = 0;
         for reward_slash in &reward_slashes {
             let res = coll
@@ -147,6 +150,62 @@ impl Database {
                     "Added new rewards_slash to database for {:?}: {:?}",
                     context,
                     reward_slash
+                );
+                count += 1;
+            });
+        }
+
+        Ok(count)
+    }
+    pub async fn store_nomination_event(
+        &self,
+        context: &Context,
+        data: &Response<NominationsPage>,
+    ) -> Result<usize> {
+        let coll = self
+            .db
+            .collection::<ContextData<Validator>>(COLL_NOMINATIONS_RAW);
+
+        // Add the full context to each entry, so the corresponding account
+        // can be identified.
+        let validators: Vec<ContextData<Validator>> = data
+            .data
+            .list
+            .as_ref()
+            .ok_or(anyhow!("No nominations found in response body"))?
+            .iter()
+            .map(|v| ContextData {
+                context_id: context.id(),
+                data: Cow::Borrowed(v),
+            })
+            .collect();
+
+        // Insert new entries. Return count of how many were newly inserted.
+        let mut count = 0;
+        for validator in &validators {
+            let res = coll
+                .update_one(
+                    doc! {
+                        "context_id": context.id().to_bson()?,
+                        "data.validator_stash": validator.data.validator_stash.to_bson()?,
+                    },
+                    doc! {
+                        "$setOnInsert": validator.to_bson()?,
+                    },
+                    {
+                        let mut opt = UpdateOptions::default();
+                        opt.upsert = Some(true);
+                        Some(opt)
+                    },
+                )
+                .await?;
+
+            assert_eq!(res.modified_count, 0);
+            res.upserted_id.map(|_| {
+                trace!(
+                    "Added new rewards_slash to database for {:?}: {:?}",
+                    context,
+                    validator
                 );
                 count += 1;
             });
