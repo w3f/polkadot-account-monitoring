@@ -325,4 +325,56 @@ mod tests {
         let count = db.store_reward_slash_event(&bob, &resp).await.unwrap();
         assert_eq!(count, 10);
     }
+
+    #[tokio::test]
+    async fn store_nomination_event() {
+        let db = db().await;
+
+        // Must now have an influence on data.
+        let alice = Context::alice();
+        let bob = Context::bob();
+
+        // Gen test data
+        let mut resp: Response<NominationsPage> = Default::default();
+        resp.data.list = Some(vec![Default::default(); 10]);
+        resp.data
+            .list
+            .as_mut()
+            .unwrap()
+            .iter_mut()
+            .enumerate()
+            .for_each(|(idx, e)| e.validator_stash = idx.to_string().into());
+
+        // New data is inserted
+        let count = db.store_nomination_event(&alice, &resp).await.unwrap();
+        assert_eq!(count, 10);
+
+        // No new data is inserted
+        let count = db.store_nomination_event(&alice, &resp).await.unwrap();
+        assert_eq!(count, 0);
+
+        // Gen new test data
+        let mut new_resp: Response<NominationsPage> = Default::default();
+        new_resp.data.list = Some(vec![Default::default(); 15]);
+        new_resp
+            .data
+            .list
+            .as_mut()
+            .unwrap()
+            .iter_mut()
+            .enumerate()
+            .for_each(|(idx, e)| e.validator_stash = (idx + 10).to_string().into());
+
+        // New data is inserted
+        let count = db.store_nomination_event(&bob, &new_resp).await.unwrap();
+        assert_eq!(count, 15);
+
+        // No new data is inserted
+        let count = db.store_nomination_event(&bob, &new_resp).await.unwrap();
+        assert_eq!(count, 0);
+
+        // Insert previous data (under a new context)
+        let count = db.store_nomination_event(&bob, &resp).await.unwrap();
+        assert_eq!(count, 10);
+    }
 }
