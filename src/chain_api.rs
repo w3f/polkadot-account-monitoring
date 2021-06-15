@@ -2,6 +2,7 @@ use crate::{BlockNumber, Context, Result, Timestamp};
 use reqwest::header::{CONTENT_TYPE, USER_AGENT};
 use reqwest::Client;
 use serde::{de::DeserializeOwned, Serialize};
+use std::fmt;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use tokio::time::{sleep, Duration};
@@ -221,6 +222,12 @@ pub struct StashAccountDisplay {
 
 #[derive(Default, Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub struct ExtrinsicIndex(String);
+
+impl fmt::Display for ExtrinsicIndex {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
 
 #[derive(Default, Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub struct ExtrinsicHash(String);

@@ -3,7 +3,7 @@ use crate::chain_api::{
 };
 use crate::database::{ContextData, Database, DatabaseReader};
 use crate::{Context, Result, Timestamp};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::marker::PhantomData;
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -282,7 +282,7 @@ trait GenerateReport {
     type Report;
 
     async fn fetch_data(&self) -> Result<Option<Self::Data>>;
-    fn generate(data: &Self::Data) -> Self::Report;
+    async fn generate(&self, data: &Self::Data) -> Result<Self::Report>;
     async fn publish(&self, report: &Self::Report) -> Result<()>;
 }
 
@@ -294,10 +294,15 @@ pub struct TransfersReport<'a> {
     _p: PhantomData<&'a ()>,
 }
 
+pub struct TransferReportRaw {
+    all: String,
+    summary: String,
+}
+
 #[async_trait]
 impl<'a> GenerateReport for TransfersReport<'a> {
     type Data = Vec<ContextData<'a, Transfer>>;
-    type Report = ();
+    type Report = TransferReportRaw;
 
     async fn fetch_data(&self) -> Result<Option<Self::Data>> {
         let now = Timestamp::now();
@@ -315,8 +320,59 @@ impl<'a> GenerateReport for TransfersReport<'a> {
             Ok(None)
         }
     }
-    fn generate(data: &Self::Data) -> Self::Report {
-        unimplemented!()
+    async fn generate(&self, data: &Self::Data) -> Result<Self::Report> {
+        let contexts = self.contexts.read().await;
+
+        // List all transfers.
+        let mut raw_all =
+            String::from("Block Number,Block Timestamp,From,To,Amount,Extrinsic Index,Success");
+        // Create summary of all accounts.
+        let mut summary: HashMap<Context, u64> = HashMap::new();
+
+        for entry in data {
+            // TODO: Improve performance here.
+            let context = contexts
+                .iter()
+                .find(|c| c.stash == entry.context_id.stash.clone().into_owned())
+                .ok_or(anyhow!("No context found while generating reports"))?;
+
+            let amount = entry.data.amount.parse::<u64>()?;
+
+            let data = entry.data.to_owned();
+            raw_all.push_str(&format!(
+                "{},{},{},{},{},{},{}",
+                data.block_num,
+                data.block_timestamp,
+                data.from,
+                data.to,
+                data.amount,
+                data.extrinsic_index,
+                data.success,
+            ));
+
+            // Sum amount for each context.
+            summary
+                .entry(context.clone())
+                .and_modify(|a| *a += amount)
+                .or_insert(amount);
+        }
+
+        let mut raw_summary = String::from("Network,Address,Description,Amount\n");
+
+        for (context, amount) in summary {
+            raw_summary.push_str(&format!(
+                "{},{},{},{}\n",
+                context.network.as_str(),
+                context.stash,
+                context.description,
+                amount
+            ))
+        }
+
+        Ok(TransferReportRaw {
+            all: raw_all,
+            summary: raw_summary,
+        })
     }
     async fn publish(&self, report: &Self::Report) -> Result<()> {
         unimplemented!()

@@ -11,6 +11,7 @@ use self::core::{Module, ScrapingService};
 use anyhow::Error;
 use database::Database;
 use log::LevelFilter;
+use std::fmt;
 use std::ops::Sub;
 use std::{borrow::Cow, fs::read_to_string};
 
@@ -26,6 +27,12 @@ pub struct BlockNumber(u64);
 impl From<u64> for BlockNumber {
     fn from(val: u64) -> Self {
         BlockNumber(val)
+    }
+}
+
+impl fmt::Display for BlockNumber {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
     }
 }
 
@@ -60,6 +67,12 @@ impl From<u64> for Timestamp {
     }
 }
 
+impl fmt::Display for Timestamp {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 struct Config {
     database: DatabaseConfig,
@@ -74,11 +87,11 @@ struct DatabaseConfig {
     name: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Context {
-    stash: String,
-    network: Network,
-    description: String,
+    pub stash: String,
+    pub network: Network,
+    pub description: String,
 }
 
 impl Context {
@@ -98,11 +111,11 @@ impl Context {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ContextId<'a> {
-    stash: Cow<'a, String>,
-    network: Network,
+    pub stash: Cow<'a, String>,
+    pub network: Network,
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Network {
     Polkadot,

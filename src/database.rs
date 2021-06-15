@@ -31,9 +31,9 @@ impl<T: Serialize> ToBson for T {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub struct ContextData<'a, T: Clone> {
-    context_id: ContextId<'a>,
-    timestamp: Timestamp,
-    data: Cow<'a, T>,
+    pub context_id: ContextId<'a>,
+    pub timestamp: Timestamp,
+    pub data: Cow<'a, T>,
 }
 
 #[derive(Clone)]
