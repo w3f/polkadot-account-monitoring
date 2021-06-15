@@ -275,7 +275,7 @@ impl ReportGenerator {
     }
     pub async fn fetch_rewards_slashes<'a>(
         &self,
-        contexts: &[Context],
+        contexts: &[&Context],
         from: BlockNumber,
         to: BlockNumber,
     ) -> Result<Vec<ContextData<'a, RewardSlash>>> {
@@ -285,14 +285,20 @@ impl ReportGenerator {
 
         let mut cursor = coll.find(doc!{
             "context_id": {
-                "$in": contexts.iter().map(|c| c.as_str()).collect::<Vec<&str>>().to_bson()?,
+                "$in": contexts.iter().map(|c| c.id()).collect::<Vec<ContextId>>().to_bson()?,
             },
-            "data.block_num": {
-                "$gt": from.to_bson()?
-            },
-            "data.block_num": {
-                "$lt": to.to_bson()?
-            }
+            "$and": [
+                {
+                    "data.block_num": {
+                        "$gte": from.to_bson()?
+                    }
+                },
+                {
+                    "data.block_num": {
+                        "$lte": to.to_bson()?
+                    }
+                }
+            ]
         }, None).await?;
 
         let mut rewards_slashes = vec![];
@@ -527,5 +533,62 @@ mod tests {
                 .as_slice(),
             &resp.data.transfers.unwrap()[3..9]
         );
+
+        // Fetch data (invalid)
+        let res = report
+            .fetch_transfers(&[&bob], Timestamp::from(300), Timestamp::from(800))
+            .await
+            .unwrap();
+
+        assert!(res.is_empty());
+    }
+
+    #[tokio::test]
+    async fn fetch_rewards_slashes() {
+        let db = db().await;
+        let report = db.reporter();
+
+        // Must now have an influence on data.
+        let alice = Context::alice();
+        let bob = Context::bob();
+
+        // Gen test data
+        let mut resp: Response<RewardsSlashesPage> = Default::default();
+        resp.data.list = Some(vec![Default::default(); 10]);
+        resp.data
+            .list
+            .as_mut()
+            .unwrap()
+            .iter_mut()
+            .enumerate()
+            .for_each(|(idx, t)| {
+                t.block_num = BlockNumber::from(idx as u64 * 100);
+                t.extrinsic_hash = idx.to_string().into();
+            });
+
+        // New data is inserted
+        let _ = db.store_reward_slash_event(&alice, &resp).await.unwrap();
+
+        // Fetch data
+        let res = report
+            .fetch_rewards_slashes(&[&alice], BlockNumber::from(300), BlockNumber::from(800))
+            .await
+            .unwrap();
+
+        assert_eq!(
+            res.iter()
+                .map(|c| c.data.clone().into_owned())
+                .collect::<Vec<RewardSlash>>()
+                .as_slice(),
+            &resp.data.list.unwrap()[3..9]
+        );
+
+        // Fetch data (invalid)
+        let res = report
+            .fetch_rewards_slashes(&[&bob], BlockNumber::from(300), BlockNumber::from(800))
+            .await
+            .unwrap();
+
+        assert!(res.is_empty());
     }
 }

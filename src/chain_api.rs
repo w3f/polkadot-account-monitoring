@@ -236,7 +236,7 @@ pub struct RewardsSlashesPage {
 #[serde(rename_all = "snake_case")]
 pub struct RewardSlash {
     pub event_index: String,
-    pub block_num: i64,
+    pub block_num: BlockNumber,
     pub extrinsic_idx: i64,
     pub module_id: String,
     pub event_id: String,
