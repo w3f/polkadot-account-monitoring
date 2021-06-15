@@ -99,19 +99,15 @@ impl ChainApi {
     pub async fn request_nominations(
         &self,
         context: &Context,
-        row: usize,
-        page: usize,
     ) -> Result<Response<NominationsPage>> {
         Ok(self
             .post(
                 &format!(
-                    "https://{}.api.subscan.io/api/scan/staking/nominators",
+                    "https://{}.api.subscan.io/api/scan/staking/voted",
                     context.network().as_str()
                 ),
-                &PageBody {
+                &Address {
                     address: context.as_str(),
-                    row: row,
-                    page: page,
                 },
             )
             .await?)
@@ -123,6 +119,11 @@ struct PageBody<'a> {
     address: &'a str,
     row: usize,
     page: usize,
+}
+
+#[derive(Serialize)]
+struct Address<'a> {
+    address: &'a str,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -186,20 +187,36 @@ pub struct Parent {
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct NominationsPage {
-    pub count: i64,
-    pub list: Option<Vec<Validator>>,
+    pub list: Option<Vec<Nomination>>,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct Validator {
+pub struct Nomination {
     pub rank_validator: Option<i64>,
-    pub nickname: String,
-    pub validator_stash: String,
-    pub validator_controller: String,
     pub bonded_nominators: String,
     pub bonded_owner: String,
     pub count_nominators: i64,
     pub validator_prefs_value: i64,
+    pub latest_mining: i64,
+    pub reward_point: i64,
+    pub session_key: Option<::serde_json::Value>,
+    pub stash_account_display: StashAccountDisplay,
+    pub controller_account_display: Option<::serde_json::Value>,
+    pub node_name: String,
+    pub reward_account: String,
+    pub reward_pot_balance: String,
+    pub grandpa_vote: i64,
+    pub bonded: String,
+}
+
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct StashAccountDisplay {
+    pub address: String,
+    pub display: String,
+    pub judgements: Option<::serde_json::Value>,
+    pub account_index: String,
+    pub identity: bool,
+    pub parent: Option<Parent>,
 }
 
 #[derive(Default, Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]

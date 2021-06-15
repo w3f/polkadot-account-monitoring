@@ -1,7 +1,7 @@
 use crate::chain_api::{
-    NominationsPage, Response, RewardSlash, RewardsSlashesPage, Transfer, TransfersPage, Validator,
+    Nomination, NominationsPage, Response, RewardSlash, RewardsSlashesPage, Transfer, TransfersPage,
 };
-use crate::{Context, ContextId, Result, BlockNumber, Timestamp};
+use crate::{BlockNumber, Context, ContextId, Result, Timestamp};
 use bson::{doc, to_bson, to_document, Bson, Document};
 use futures::StreamExt;
 use mongodb::options::UpdateOptions;
@@ -165,11 +165,11 @@ impl Database {
     ) -> Result<usize> {
         let coll = self
             .db
-            .collection::<ContextData<Validator>>(COLL_NOMINATIONS_RAW);
+            .collection::<ContextData<Nomination>>(COLL_NOMINATIONS_RAW);
 
         // Add the full context to each entry, so the corresponding account
         // can be identified.
-        let validators: Vec<ContextData<Validator>> = data
+        let validators: Vec<ContextData<Nomination>> = data
             .data
             .list
             .as_ref()
@@ -188,7 +188,7 @@ impl Database {
                 .update_one(
                     doc! {
                         "context_id": context.id().to_bson()?,
-                        "data.validator_stash": validator.data.validator_stash.to_bson()?,
+                        "data.stash_account_display.address": validator.data.stash_account_display.address.to_bson()?,
                     },
                     doc! {
                         "$setOnInsert": validator.to_bson()?,
@@ -288,10 +288,10 @@ impl ReportGenerator {
     pub async fn fetch_nominations<'a>(
         &self,
         contexts: &[Context],
-    ) -> Result<Vec<ContextData<'a, Validator>>> {
+    ) -> Result<Vec<ContextData<'a, Nomination>>> {
         let coll = self
             .db
-            .collection::<ContextData<Validator>>(COLL_NOMINATIONS_RAW);
+            .collection::<ContextData<Nomination>>(COLL_NOMINATIONS_RAW);
 
         let mut cursor = coll.find(doc!{
             "context_id": {
@@ -312,7 +312,7 @@ impl ReportGenerator {
 mod tests {
     use super::*;
     use crate::chain_api::{Response, TransfersPage};
-    use crate::tests::db;
+    use crate::tests::{db, generator};
     use crate::Context;
 
     #[tokio::test]
@@ -436,7 +436,7 @@ mod tests {
             .unwrap()
             .iter_mut()
             .enumerate()
-            .for_each(|(idx, e)| e.validator_stash = idx.to_string().into());
+            .for_each(|(idx, e)| e.stash_account_display.address = idx.to_string().into());
 
         // New data is inserted
         let count = db.store_nomination_event(&alice, &resp).await.unwrap();
@@ -456,7 +456,7 @@ mod tests {
             .unwrap()
             .iter_mut()
             .enumerate()
-            .for_each(|(idx, e)| e.validator_stash = (idx + 10).to_string().into());
+            .for_each(|(idx, e)| e.stash_account_display.address = (idx + 10).to_string().into());
 
         // New data is inserted
         let count = db.store_nomination_event(&bob, &new_resp).await.unwrap();
@@ -469,5 +469,25 @@ mod tests {
         // Insert previous data (under a new context)
         let count = db.store_nomination_event(&bob, &resp).await.unwrap();
         assert_eq!(count, 10);
+    }
+
+    #[tokio::test]
+    async fn fetch_transfers() {
+        let db = generator().await;
+
+        // Must now have an influence on data.
+        let alice = Context::alice();
+        let bob = Context::bob();
+
+        // Gen test data
+        let mut resp: Response<TransfersPage> = Default::default();
+        resp.data.transfers = Some(vec![Default::default(); 10]);
+        resp.data
+            .transfers
+            .as_mut()
+            .unwrap()
+            .iter_mut()
+            .enumerate()
+            .for_each(|(idx, t)| t.extrinsic_index = idx.to_string().into());
     }
 }

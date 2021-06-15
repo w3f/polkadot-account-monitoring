@@ -71,8 +71,8 @@ impl FetchChainData for NominationsFetcher {
     fn new(db: Database, api: Arc<ChainApi>) -> Self {
         NominationsFetcher { db: db, api: api }
     }
-    async fn fetch_data(&self, context: &Context, row: usize, page: usize) -> Result<Self::Data> {
-        self.api.request_nominations(context, row, page).await
+    async fn fetch_data(&self, context: &Context, _row: usize, _page: usize) -> Result<Self::Data> {
+        self.api.request_nominations(context).await
     }
     async fn store_data(&self, context: &Context, data: &Self::Data) -> Result<usize> {
         self.db.store_nomination_event(context, data).await
