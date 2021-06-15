@@ -259,6 +259,54 @@ impl<'a> ScrapingService<'a> {
     }
 }
 
+pub struct ReportGenerator {
+
+}
+
+impl ReportGenerator {
+    pub fn new() -> Self {
+        ReportGenerator {
+
+        }
+    }
+    async fn run_generator<T>(&self)
+    where
+        T: 'static + Send + Sync + GenerateReport,
+    {
+        unimplemented!()
+    }
+}
+
+#[async_trait]
+trait GenerateReport {
+    type Data;
+    type Report;
+
+    async fn fetch_data(&self) -> Result<Self::Data>;
+    fn generate(data: &Self::Data) -> Self::Report;
+    async fn publish(&self, report: &Self::Report) -> Result<()>;
+}
+
+pub struct TransfersReport {
+
+}
+
+#[async_trait]
+impl GenerateReport for TransfersReport {
+    type Data = ();
+    type Report = ();
+
+    async fn fetch_data(&self) -> Result<Self::Data> {
+        unimplemented!()
+    }
+    fn generate(data: &Self::Data) -> Self::Report {
+        unimplemented!()
+    }
+    async fn publish(&self, report: &Self::Report) -> Result<()> {
+        unimplemented!()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
