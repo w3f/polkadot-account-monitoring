@@ -240,7 +240,7 @@ impl DatabaseReader {
     }
     pub async fn fetch_transfers<'a>(
         &self,
-        contexts: &[&Context],
+        contexts: &[Context],
         from: Timestamp,
         to: Timestamp,
     ) -> Result<Vec<ContextData<'a, Transfer>>> {
@@ -275,7 +275,7 @@ impl DatabaseReader {
     }
     pub async fn fetch_rewards_slashes<'a>(
         &self,
-        contexts: &[&Context],
+        contexts: &[Context],
         from: BlockNumber,
         to: BlockNumber,
     ) -> Result<Vec<ContextData<'a, RewardSlash>>> {
@@ -522,7 +522,7 @@ mod tests {
 
         // Fetch data
         let res = report
-            .fetch_transfers(&[&alice], Timestamp::from(300), Timestamp::from(800))
+            .fetch_transfers(&[alice], Timestamp::from(300), Timestamp::from(800))
             .await
             .unwrap();
 
@@ -536,7 +536,7 @@ mod tests {
 
         // Fetch data (invalid)
         let res = report
-            .fetch_transfers(&[&bob], Timestamp::from(300), Timestamp::from(800))
+            .fetch_transfers(&[bob], Timestamp::from(300), Timestamp::from(800))
             .await
             .unwrap();
 
@@ -571,7 +571,7 @@ mod tests {
 
         // Fetch data
         let res = report
-            .fetch_rewards_slashes(&[&alice], BlockNumber::from(300), BlockNumber::from(800))
+            .fetch_rewards_slashes(&[alice], BlockNumber::from(300), BlockNumber::from(800))
             .await
             .unwrap();
 
@@ -585,7 +585,7 @@ mod tests {
 
         // Fetch data (invalid)
         let res = report
-            .fetch_rewards_slashes(&[&bob], BlockNumber::from(300), BlockNumber::from(800))
+            .fetch_rewards_slashes(&[bob], BlockNumber::from(300), BlockNumber::from(800))
             .await
             .unwrap();
 

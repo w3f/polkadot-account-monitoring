@@ -1,7 +1,10 @@
-use crate::chain_api::{ChainApi, NominationsPage, Response, RewardsSlashesPage, TransfersPage};
-use crate::database::Database;
-use crate::{Context, Result};
+use crate::chain_api::{
+    ChainApi, NominationsPage, Response, RewardsSlashesPage, Transfer, TransfersPage,
+};
+use crate::database::{ContextData, Database, DatabaseReader};
+use crate::{Context, Result, Timestamp};
 use std::collections::HashSet;
+use std::marker::PhantomData;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tokio::time::{sleep, Duration};
@@ -259,15 +262,11 @@ impl<'a> ScrapingService<'a> {
     }
 }
 
-pub struct ReportGenerator {
-
-}
+pub struct ReportGenerator {}
 
 impl ReportGenerator {
     pub fn new() -> Self {
-        ReportGenerator {
-
-        }
+        ReportGenerator {}
     }
     async fn run_generator<T>(&self)
     where
@@ -282,22 +281,39 @@ trait GenerateReport {
     type Data;
     type Report;
 
-    async fn fetch_data(&self) -> Result<Self::Data>;
+    async fn fetch_data(&self) -> Result<Option<Self::Data>>;
     fn generate(data: &Self::Data) -> Self::Report;
     async fn publish(&self, report: &Self::Report) -> Result<()>;
 }
 
-pub struct TransfersReport {
-
+pub struct TransfersReport<'a> {
+    report_range: u64,
+    last_report: Option<Timestamp>,
+    reader: DatabaseReader,
+    contexts: Arc<RwLock<Vec<Context>>>,
+    _p: PhantomData<&'a ()>,
 }
 
 #[async_trait]
-impl GenerateReport for TransfersReport {
-    type Data = ();
+impl<'a> GenerateReport for TransfersReport<'a> {
+    type Data = Vec<ContextData<'a, Transfer>>;
     type Report = ();
 
-    async fn fetch_data(&self) -> Result<Self::Data> {
-        unimplemented!()
+    async fn fetch_data(&self) -> Result<Option<Self::Data>> {
+        let now = Timestamp::now();
+        let last_report = self.last_report.unwrap_or(Timestamp::from(0));
+
+        if last_report < (now - Timestamp::from(self.report_range)) {
+            let contexts = self.contexts.read().await;
+            let data = self
+                .reader
+                .fetch_transfers(contexts.as_slice(), last_report, now)
+                .await?;
+
+            Ok(Some(data))
+        } else {
+            Ok(None)
+        }
     }
     fn generate(data: &Self::Data) -> Self::Report {
         unimplemented!()

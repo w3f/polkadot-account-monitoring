@@ -11,6 +11,7 @@ use self::core::{Module, ScrapingService};
 use anyhow::Error;
 use database::Database;
 use log::LevelFilter;
+use std::ops::Sub;
 use std::{borrow::Cow, fs::read_to_string};
 
 mod chain_api;
@@ -19,7 +20,7 @@ mod database;
 
 pub type Result<T> = std::result::Result<T, Error>;
 
-#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Default, Copy, Serialize, Deserialize)]
 pub struct BlockNumber(u64);
 
 impl From<u64> for BlockNumber {
@@ -28,7 +29,7 @@ impl From<u64> for BlockNumber {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Default, Copy, PartialOrd, Serialize, Deserialize)]
 pub struct Timestamp(u64);
 
 impl Timestamp {
@@ -42,6 +43,14 @@ impl Timestamp {
             .as_secs();
 
         Timestamp(time)
+    }
+}
+
+impl Sub for Timestamp {
+    type Output = Self;
+
+    fn sub(self, other: Self) -> Self::Output {
+        Timestamp(self.0 - other.0)
     }
 }
 
