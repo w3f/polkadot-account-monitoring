@@ -219,8 +219,8 @@ impl Database {
         Ok(count)
     }
     #[cfg(test)]
-    fn reporter(&self) -> ReportGenerator {
-        ReportGenerator {
+    fn reader(&self) -> DatabaseReader {
+        DatabaseReader {
             db: self.db.clone(),
         }
     }
@@ -228,13 +228,13 @@ impl Database {
 
 #[derive(Clone)]
 // TODO: Rename
-pub struct ReportGenerator {
+pub struct DatabaseReader {
     db: MongoDb,
 }
 
-impl ReportGenerator {
+impl DatabaseReader {
     pub async fn new(uri: &str, db: &str) -> Result<Self> {
-        Ok(ReportGenerator {
+        Ok(DatabaseReader {
             db: Client::with_uri_str(uri).await?.database(db),
         })
     }
@@ -497,7 +497,7 @@ mod tests {
     #[tokio::test]
     async fn fetch_transfers() {
         let db = db().await;
-        let report = db.reporter();
+        let report = db.reader();
 
         // Must now have an influence on data.
         let alice = Context::alice();
@@ -546,7 +546,7 @@ mod tests {
     #[tokio::test]
     async fn fetch_rewards_slashes() {
         let db = db().await;
-        let report = db.reporter();
+        let report = db.reader();
 
         // Must now have an influence on data.
         let alice = Context::alice();
