@@ -1,7 +1,7 @@
 use crate::chain_api::{
     NominationsPage, Response, RewardSlash, RewardsSlashesPage, Transfer, TransfersPage, Validator,
 };
-use crate::{Context, ContextId, Result};
+use crate::{Context, ContextId, Result, BlockNumber, Timestamp};
 use bson::{doc, to_bson, to_document, Bson, Document};
 use futures::StreamExt;
 use mongodb::options::UpdateOptions;
@@ -230,9 +230,8 @@ impl ReportGenerator {
     pub async fn fetch_transfers<'a>(
         &self,
         contexts: &[Context],
-        // TODO: Add types-safety for timestamp
-        from: u64,
-        to: u64,
+        from: Timestamp,
+        to: Timestamp,
     ) -> Result<Vec<ContextData<'a, Transfer>>> {
         let coll = self
             .db
@@ -260,9 +259,8 @@ impl ReportGenerator {
     pub async fn fetch_rewards_slashes<'a>(
         &self,
         contexts: &[Context],
-        // TODO: Add types-safety for **block number**
-        from: u64,
-        to: u64,
+        from: BlockNumber,
+        to: BlockNumber,
     ) -> Result<Vec<ContextData<'a, RewardSlash>>> {
         let coll = self
             .db

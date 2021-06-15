@@ -20,6 +20,12 @@ mod database;
 pub type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct BlockNumber(u64);
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Timestamp(u64);
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 struct Config {
     database: DatabaseConfig,
     active_modules: Vec<Module>,

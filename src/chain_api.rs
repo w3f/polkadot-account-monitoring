@@ -192,7 +192,7 @@ pub struct NominationsPage {
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Validator {
-    pub rank_validator: i64,
+    pub rank_validator: Option<i64>,
     pub nickname: String,
     pub validator_stash: String,
     pub validator_controller: String,
