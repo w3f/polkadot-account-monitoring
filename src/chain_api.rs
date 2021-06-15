@@ -1,4 +1,4 @@
-use crate::{Context, Result};
+use crate::{BlockNumber, Context, Result, Timestamp};
 use reqwest::header::{CONTENT_TYPE, USER_AGENT};
 use reqwest::Client;
 use serde::{de::DeserializeOwned, Serialize};
@@ -143,8 +143,8 @@ pub struct TransfersPage {
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Transfer {
     pub amount: String,
-    pub block_num: i64,
-    pub block_timestamp: i64,
+    pub block_num: BlockNumber,
+    pub block_timestamp: Timestamp,
     pub extrinsic_index: ExtrinsicIndex,
     pub fee: String,
     pub from: String,

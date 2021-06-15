@@ -19,11 +19,37 @@ mod database;
 
 pub type Result<T> = std::result::Result<T, Error>;
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 pub struct BlockNumber(u64);
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+impl From<u64> for BlockNumber {
+    fn from(val: u64) -> Self {
+        BlockNumber(val)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 pub struct Timestamp(u64);
+
+impl Timestamp {
+    pub fn now() -> Self {
+        use std::time::{SystemTime, UNIX_EPOCH};
+
+        let start = SystemTime::now();
+        let time = start
+            .duration_since(UNIX_EPOCH)
+            .expect("Failed to calculate UNIX time")
+            .as_secs();
+
+        Timestamp(time)
+    }
+}
+
+impl From<u64> for Timestamp {
+    fn from(val: u64) -> Self {
+        Timestamp(val)
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 struct Config {

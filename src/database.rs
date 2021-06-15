@@ -32,6 +32,7 @@ impl<T: Serialize> ToBson for T {
 #[serde(rename_all = "snake_case")]
 pub struct ContextData<'a, T: Clone> {
     context_id: ContextId<'a>,
+    timestamp: Timestamp,
     data: Cow<'a, T>,
 }
 
@@ -65,6 +66,7 @@ impl Database {
             .iter()
             .map(|t| ContextData {
                 context_id: context.id(),
+                timestamp: Timestamp::now(),
                 data: Cow::Borrowed(t),
             })
             .collect();
@@ -121,6 +123,7 @@ impl Database {
             .iter()
             .map(|rs| ContextData {
                 context_id: context.id(),
+                timestamp: Timestamp::now(),
                 data: Cow::Borrowed(rs),
             })
             .collect();
@@ -177,6 +180,7 @@ impl Database {
             .iter()
             .map(|v| ContextData {
                 context_id: context.id(),
+                timestamp: Timestamp::now(),
                 data: Cow::Borrowed(v),
             })
             .collect();
@@ -214,9 +218,16 @@ impl Database {
 
         Ok(count)
     }
+    #[cfg(test)]
+    fn reporter(&self) -> ReportGenerator {
+        ReportGenerator {
+            db: self.db.clone(),
+        }
+    }
 }
 
 #[derive(Clone)]
+// TODO: Rename
 pub struct ReportGenerator {
     db: MongoDb,
 }
@@ -229,7 +240,7 @@ impl ReportGenerator {
     }
     pub async fn fetch_transfers<'a>(
         &self,
-        contexts: &[Context],
+        contexts: &[&Context],
         from: Timestamp,
         to: Timestamp,
     ) -> Result<Vec<ContextData<'a, Transfer>>> {
@@ -239,14 +250,20 @@ impl ReportGenerator {
 
         let mut cursor = coll.find(doc!{
             "context_id": {
-                "$in": contexts.iter().map(|c| c.as_str()).collect::<Vec<&str>>().to_bson()?,
+                "$in": contexts.iter().map(|c| c.id()).collect::<Vec<ContextId>>().to_bson()?,
             },
-            "data.block_timestamp": {
-                "$gt": from.to_bson()?
-            },
-            "data.block_timestamp": {
-                "$lt": to.to_bson()?
-            }
+            "$and": [
+                {
+                    "data.block_timestamp": {
+                        "$gte": from.to_bson()?
+                    }
+                },
+                {
+                    "data.block_timestamp": {
+                        "$lte": to.to_bson()?
+                    }
+                }
+            ]
         }, None).await?;
 
         let mut transfers = vec![];
@@ -473,7 +490,8 @@ mod tests {
 
     #[tokio::test]
     async fn fetch_transfers() {
-        let db = generator().await;
+        let db = db().await;
+        let report = db.reporter();
 
         // Must now have an influence on data.
         let alice = Context::alice();
@@ -488,6 +506,26 @@ mod tests {
             .unwrap()
             .iter_mut()
             .enumerate()
-            .for_each(|(idx, t)| t.extrinsic_index = idx.to_string().into());
+            .for_each(|(idx, t)| {
+                t.block_timestamp = Timestamp::from(idx as u64 * 100);
+                t.extrinsic_index = idx.to_string().into();
+            });
+
+        // New data is inserted
+        let _ = db.store_transfer_event(&alice, &resp).await.unwrap();
+
+        // Fetch data
+        let res = report
+            .fetch_transfers(&[&alice], Timestamp::from(300), Timestamp::from(800))
+            .await
+            .unwrap();
+
+        assert_eq!(
+            res.iter()
+                .map(|c| c.data.clone().into_owned())
+                .collect::<Vec<Transfer>>()
+                .as_slice(),
+            &resp.data.transfers.unwrap()[3..9]
+        );
     }
 }
