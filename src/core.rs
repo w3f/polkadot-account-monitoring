@@ -283,7 +283,17 @@ trait GenerateReport {
 
     async fn fetch_data(&self) -> Result<Option<Self::Data>>;
     async fn generate(&self, data: &Self::Data) -> Result<Self::Report>;
-    async fn publish(&self, report: &Self::Report) -> Result<()>;
+    async fn publish<T>(&self, publisher: Arc<T>, report: &Self::Report) -> Result<()>
+    where
+        T: Send + Sync;
+}
+
+#[async_trait]
+trait Publisher {
+    type Info;
+
+    fn set_info(&mut self, info: Self::Info);
+    async fn upload_file(&self, data: &[u8]) -> Result<()>;
 }
 
 pub struct TransfersReport<'a> {
@@ -374,7 +384,10 @@ impl<'a> GenerateReport for TransfersReport<'a> {
             summary: raw_summary,
         })
     }
-    async fn publish(&self, report: &Self::Report) -> Result<()> {
+    async fn publish<T>(&self, publisher: Arc<T>, report: &Self::Report) -> Result<()>
+    where
+        T: Send + Sync,
+    {
         unimplemented!()
     }
 }
