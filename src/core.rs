@@ -3,7 +3,7 @@ use crate::chain_api::{
 };
 use crate::database::{ContextData, Database, DatabaseReader};
 use crate::{Context, Result, Timestamp};
-use google_drive::GoogleDrive;
+use google_drive::GoogleDrive as RawGoogleDrive;
 use std::collections::{HashMap, HashSet};
 use std::marker::PhantomData;
 use std::sync::Arc;
@@ -23,7 +23,7 @@ pub struct TransferFetcher {
 impl FetchChainData for TransferFetcher {
     type Data = Response<TransfersPage>;
 
-    fn name(&self) -> &'static str {
+    fn name() -> &'static str {
         "TransferFetcher"
     }
     fn new(db: Database, api: Arc<ChainApi>) -> Self {
@@ -46,7 +46,7 @@ pub struct RewardsSlashesFetcher {
 impl FetchChainData for RewardsSlashesFetcher {
     type Data = Response<RewardsSlashesPage>;
 
-    fn name(&self) -> &'static str {
+    fn name() -> &'static str {
         "RewardsSlashesFetcher"
     }
     fn new(db: Database, api: Arc<ChainApi>) -> Self {
@@ -69,7 +69,7 @@ pub struct NominationsFetcher {
 impl FetchChainData for NominationsFetcher {
     type Data = Response<NominationsPage>;
 
-    fn name(&self) -> &'static str {
+    fn name() -> &'static str {
         "NominationsFetcher"
     }
     fn new(db: Database, api: Arc<ChainApi>) -> Self {
@@ -87,7 +87,7 @@ impl FetchChainData for NominationsFetcher {
 pub trait FetchChainData {
     type Data: Send + Sync + std::fmt::Debug + DataInfo;
 
-    fn name(&self) -> &'static str;
+    fn name() -> &'static str;
     fn new(db: Database, api: Arc<ChainApi>) -> Self;
     async fn fetch_data(&self, _: &Context, row: usize, page: usize) -> Result<Self::Data>;
     async fn store_data(&self, _: &Context, data: &Self::Data) -> Result<usize>;
@@ -185,7 +185,7 @@ impl<'a> ScrapingService<'a> {
                         if resp.is_empty() {
                             debug!(
                                 "{}: No new entries were found for {:?}, moving on...",
-                                fetcher.name(),
+                                T::name(),
                                 context
                             );
                             break;
@@ -201,7 +201,7 @@ impl<'a> ScrapingService<'a> {
                         if newly_inserted == 0 {
                             debug!(
                                 "{}: No new entries were found for {:?}, moving on...",
-                                fetcher.name(),
+                                T::name(),
                                 context
                             );
                             break;
@@ -209,7 +209,7 @@ impl<'a> ScrapingService<'a> {
 
                         info!(
                             "{}: {} new entries found for {:?}",
-                            fetcher.name(),
+                            T::name(),
                             newly_inserted,
                             context
                         );
@@ -220,7 +220,7 @@ impl<'a> ScrapingService<'a> {
                             debug!(
                                 "{}: All new entries have been fetched for {:?}, \
                             continuing with the next accounts.",
-                                fetcher.name(),
+                                T::name(),
                                 context
                             );
                             break;
@@ -247,7 +247,7 @@ impl<'a> ScrapingService<'a> {
                 if let Err(err) = local(&fetcher, &contexts).await {
                     error!(
                         "Failed task while running fetcher '{}': {:?}",
-                        fetcher.name(),
+                        T::name(),
                         err
                     );
                 }
@@ -269,8 +269,31 @@ impl ReportGenerator {
     pub fn new() -> Self {
         ReportGenerator {}
     }
-    async fn run_generator(&self) {
-        unimplemented!()
+    async fn run_generator<T, P>(&self)
+    where
+        T: 'static + Send + Sync + GenerateReport<P>,
+        P: Send + Sync,
+    {
+        async fn local<T, P>() -> Result<()>
+        where
+            T: 'static + Send + Sync + GenerateReport<P>,
+        {
+            Ok(())
+        }
+
+        tokio::spawn(async move {
+            loop {
+                if let Err(err) = local::<T, P>().await {
+                    error!(
+                        "Failed task while running report generator '{}': {:?}",
+                        T::name(),
+                        err
+                    );
+                }
+
+                sleep(Duration::from_secs(FAILED_TASK_SLEEP)).await;
+            }
+        });
     }
 }
 
@@ -279,6 +302,7 @@ trait GenerateReport<T> {
     type Data;
     type Report;
 
+    fn name() -> &'static str;
     async fn fetch_data(&self) -> Result<Option<Self::Data>>;
     async fn generate(&self, data: &Self::Data) -> Result<Self::Report>;
     async fn publish(&self, publisher: Arc<T>, report: Self::Report) -> Result<()>;
@@ -291,12 +315,12 @@ trait Publisher {
     async fn upload_data(&self, data: Self::Data) -> Result<()>;
 }
 
-pub struct GoogleCloud {
-    drive: GoogleDrive,
+pub struct GoogleDrive {
+    drive: RawGoogleDrive,
 }
 
 #[async_trait]
-impl Publisher for GoogleCloud {
+impl Publisher for GoogleDrive {
     type Data = StoragePayload;
 
     async fn upload_data(&self, data: Self::Data) -> Result<()> {
@@ -328,7 +352,7 @@ pub struct StoragePayload {
     is_public: bool,
 }
 
-pub struct TransfersReport<'a> {
+pub struct TransferReportGenerator<'a> {
     report_range: u64,
     last_report: Option<Timestamp>,
     reader: DatabaseReader,
@@ -342,7 +366,7 @@ pub struct TransferReportRaw {
 }
 
 #[async_trait]
-impl<'a, T> GenerateReport<T> for TransfersReport<'a>
+impl<'a, T> GenerateReport<T> for TransferReportGenerator<'a>
 where
     T: 'static + Send + Sync + Publisher,
     <T as Publisher>::Data: Send + Sync + From<TransferReportRaw>,
@@ -350,6 +374,9 @@ where
     type Data = Vec<ContextData<'a, Transfer>>;
     type Report = TransferReportRaw;
 
+    fn name() -> &'static str {
+        "TransferReportGenerator"
+    }
     async fn fetch_data(&self) -> Result<Option<Self::Data>> {
         let now = Timestamp::now();
         let last_report = self.last_report.unwrap_or(Timestamp::from(0));
