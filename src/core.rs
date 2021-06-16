@@ -3,6 +3,7 @@ use crate::chain_api::{
 };
 use crate::database::{ContextData, Database, DatabaseReader};
 use crate::{Context, Result, Timestamp};
+use google_drive::GoogleDrive;
 use std::collections::{HashMap, HashSet};
 use std::marker::PhantomData;
 use std::sync::Arc;
@@ -283,17 +284,60 @@ trait GenerateReport {
 
     async fn fetch_data(&self) -> Result<Option<Self::Data>>;
     async fn generate(&self, data: &Self::Data) -> Result<Self::Report>;
-    async fn publish<T>(&self, publisher: Arc<T>, report: &Self::Report) -> Result<()>
+    async fn publish<T>(&self, publisher: Arc<T>, report: Self::Report) -> Result<()>
     where
-        T: Send + Sync;
+        T: Send + Sync + Publisher;
 }
 
 #[async_trait]
 trait Publisher {
-    type Info;
+    type Data;
 
-    fn set_info(&mut self, info: Self::Info);
-    async fn upload_file(&self, data: &[u8]) -> Result<()>;
+    async fn upload_data<T>(&self, data: T) -> Result<()>
+    where
+        T: Send + Sync + Into<Self::Data>;
+}
+
+pub struct GoogleCloud {
+    drive: GoogleDrive,
+}
+
+#[async_trait]
+impl Publisher for GoogleCloud {
+    type Data = StoragePayload;
+
+    async fn upload_data<T>(&self, data: T) -> Result<()>
+    where
+        T: Send + Sync + Into<Self::Data>,
+    {
+        let data: Self::Data = data.into();
+
+        self.drive
+            .upload_to_cloud_storage(
+                &data.bucket,
+                &data.name,
+                &data.mime_type,
+                &data.body,
+                data.is_public,
+            )
+            .await
+            .map(|_| ())
+            .map_err(|err| err.into())
+    }
+}
+
+impl From<TransferReportRaw> for StoragePayload {
+    fn from(val: TransferReportRaw) -> Self {
+        unimplemented!()
+    }
+}
+
+pub struct StoragePayload {
+    bucket: String,
+    name: String,
+    mime_type: String,
+    body: Vec<u8>,
+    is_public: bool,
 }
 
 pub struct TransfersReport<'a> {
@@ -384,10 +428,11 @@ impl<'a> GenerateReport for TransfersReport<'a> {
             summary: raw_summary,
         })
     }
-    async fn publish<T>(&self, publisher: Arc<T>, report: &Self::Report) -> Result<()>
+    async fn publish<T>(&self, publisher: Arc<T>, report: Self::Report) -> Result<()>
     where
-        T: Send + Sync,
+        T: Send + Sync + Publisher
     {
+        //publisher.upload_data(<>).await.map(|_| ()).map(|err| err.into())
         unimplemented!()
     }
 }
