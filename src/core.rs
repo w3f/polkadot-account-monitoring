@@ -354,7 +354,7 @@ pub struct TransferReportRaw {
 impl<'a, T> GenerateReport<T> for TransfersReport<'a>
 where
     T: 'static + Send + Sync + Publisher,
-    <T as Publisher>::Data: From<TransferReportRaw>,
+    <T as Publisher>::Data: Send + Sync + From<TransferReportRaw>,
 {
     type Data = Vec<ContextData<'a, Transfer>>;
     type Report = TransferReportRaw;
@@ -430,8 +430,11 @@ where
         })
     }
     async fn publish(&self, publisher: Arc<T>, report: Self::Report) -> Result<()> {
-        //publisher.upload_data(<T as Publisher>::Data::from(report)).await.map(|_| ()).map(|err| err.into())
-        unimplemented!()
+        publisher
+            .upload_data(<T as Publisher>::Data::from(report))
+            .await
+            .map(|_| ())
+            .map(|err| err.into())
     }
 }
 
