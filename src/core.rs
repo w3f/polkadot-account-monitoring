@@ -269,22 +269,13 @@ impl ReportGenerator {
     pub fn new() -> Self {
         ReportGenerator {}
     }
-    async fn run_generator<T, P>(&self)
-    where
-        T: 'static + Send + Sync + GenerateReport<P>,
-        P: Send + Sync + Publisher,
-        <P as Publisher>::Data: From<<T as GenerateReport<P>>::Report>,
-    {
+    async fn run_generator(&self) {
         unimplemented!()
     }
 }
 
 #[async_trait]
-trait GenerateReport<T>
-where
-    T: Send + Sync + Publisher,
-    <T as Publisher>::Data: From<Self::Report>,
-{
+trait GenerateReport<T> {
     type Data;
     type Report;
 
