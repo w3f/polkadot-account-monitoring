@@ -269,33 +269,35 @@ impl ReportGenerator {
     pub fn new() -> Self {
         ReportGenerator {}
     }
-    async fn run_generator<T>(&self)
+    async fn run_generator<T, P>(&self)
     where
-        T: 'static + Send + Sync + GenerateReport,
+        T: 'static + Send + Sync + GenerateReport<P>,
+        P: Send + Sync + Publisher,
+        <P as Publisher>::Data: From<<T as GenerateReport<P>>::Report>,
     {
         unimplemented!()
     }
 }
 
 #[async_trait]
-trait GenerateReport {
+trait GenerateReport<T>
+where
+    T: Send + Sync + Publisher,
+    <T as Publisher>::Data: From<Self::Report>,
+{
     type Data;
     type Report;
 
     async fn fetch_data(&self) -> Result<Option<Self::Data>>;
     async fn generate(&self, data: &Self::Data) -> Result<Self::Report>;
-    async fn publish<T>(&self, publisher: Arc<T>, report: Self::Report) -> Result<()>
-    where
-        T: Send + Sync + Publisher;
+    async fn publish(&self, publisher: Arc<T>, report: Self::Report) -> Result<()>;
 }
 
 #[async_trait]
 trait Publisher {
     type Data;
 
-    async fn upload_data<T>(&self, data: T) -> Result<()>
-    where
-        T: Send + Sync + Into<Self::Data>;
+    async fn upload_data(&self, data: Self::Data) -> Result<()>;
 }
 
 pub struct GoogleCloud {
@@ -306,12 +308,7 @@ pub struct GoogleCloud {
 impl Publisher for GoogleCloud {
     type Data = StoragePayload;
 
-    async fn upload_data<T>(&self, data: T) -> Result<()>
-    where
-        T: Send + Sync + Into<Self::Data>,
-    {
-        let data: Self::Data = data.into();
-
+    async fn upload_data(&self, data: Self::Data) -> Result<()> {
         self.drive
             .upload_to_cloud_storage(
                 &data.bucket,
@@ -354,7 +351,11 @@ pub struct TransferReportRaw {
 }
 
 #[async_trait]
-impl<'a> GenerateReport for TransfersReport<'a> {
+impl<'a, T> GenerateReport<T> for TransfersReport<'a>
+where
+    T: 'static + Send + Sync + Publisher,
+    <T as Publisher>::Data: From<TransferReportRaw>,
+{
     type Data = Vec<ContextData<'a, Transfer>>;
     type Report = TransferReportRaw;
 
@@ -428,11 +429,8 @@ impl<'a> GenerateReport for TransfersReport<'a> {
             summary: raw_summary,
         })
     }
-    async fn publish<T>(&self, publisher: Arc<T>, report: Self::Report) -> Result<()>
-    where
-        T: Send + Sync + Publisher
-    {
-        //publisher.upload_data(<>).await.map(|_| ()).map(|err| err.into())
+    async fn publish(&self, publisher: Arc<T>, report: Self::Report) -> Result<()> {
+        //publisher.upload_data(<T as Publisher>::Data::from(report)).await.map(|_| ()).map(|err| err.into())
         unimplemented!()
     }
 }
