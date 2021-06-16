@@ -263,27 +263,46 @@ impl<'a> ScrapingService<'a> {
     }
 }
 
-pub struct ReportGenerator {}
+pub struct ReportGenerator {
+    db: DatabaseReader,
+    contexts: Arc<RwLock<Vec<Context>>>,
+}
 
 impl ReportGenerator {
-    pub fn new() -> Self {
-        ReportGenerator {}
+    pub fn new(db: DatabaseReader) -> Self {
+        ReportGenerator {
+            db: db,
+            contexts: Default::default(),
+        }
     }
-    async fn run_generator<T, P>(&self)
+    pub async fn add_contexts(&mut self, mut contexts: Vec<Context>) {
+        self.contexts.write().await.append(&mut contexts);
+    }
+    async fn run_generator<T, P>(&self, generator: T, publisher: P)
     where
         T: 'static + Send + Sync + GenerateReport<P>,
-        P: Send + Sync,
+        P: 'static + Send + Sync,
+        <T as GenerateReport<P>>::Data: Send + Sync,
+        <T as GenerateReport<P>>::Report: Send + Sync,
     {
-        async fn local<T, P>() -> Result<()>
+        async fn local<T, P>(generator: &T, publisher: Arc<P>) -> Result<()>
         where
             T: 'static + Send + Sync + GenerateReport<P>,
         {
-            Ok(())
+            loop {
+                if let Some(data) = generator.fetch_data().await? {
+                    let report = generator.generate(&data).await?;
+                    generator.publish(Arc::clone(&publisher), report).await?;
+                }
+
+                sleep(Duration::from_secs(LOOP_INTERVAL)).await;
+            }
         }
 
+        let publisher = Arc::new(publisher);
         tokio::spawn(async move {
             loop {
-                if let Err(err) = local::<T, P>().await {
+                if let Err(err) = local::<T, P>(&generator, Arc::clone(&publisher)).await {
                     error!(
                         "Failed task while running report generator '{}': {:?}",
                         T::name(),
@@ -358,6 +377,18 @@ pub struct TransferReportGenerator<'a> {
     reader: DatabaseReader,
     contexts: Arc<RwLock<Vec<Context>>>,
     _p: PhantomData<&'a ()>,
+}
+
+impl<'a> TransferReportGenerator<'a> {
+    pub fn new(db: DatabaseReader, report_range: u64, contexts: Arc<RwLock<Vec<Context>>>) -> Self {
+        TransferReportGenerator {
+            report_range: report_range,
+            last_report: None,
+            reader: db,
+            contexts: contexts,
+            _p: PhantomData,
+        }
+    }
 }
 
 pub struct TransferReportRaw {
