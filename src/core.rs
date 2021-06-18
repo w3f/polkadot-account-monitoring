@@ -291,8 +291,9 @@ impl ReportGenerator {
         {
             loop {
                 if let Some(data) = generator.fetch_data().await? {
-                    let report = generator.generate(&data).await?;
-                    generator.publish(Arc::clone(&publisher), report).await?;
+                    for report in generator.generate(&data).await? {
+                        generator.publish(Arc::clone(&publisher), report).await?;
+                    }
                 }
 
                 sleep(Duration::from_secs(LOOP_INTERVAL)).await;
@@ -323,7 +324,7 @@ trait GenerateReport<T> {
 
     fn name() -> &'static str;
     async fn fetch_data(&self) -> Result<Option<Self::Data>>;
-    async fn generate(&self, data: &Self::Data) -> Result<Self::Report>;
+    async fn generate(&self, data: &Self::Data) -> Result<Vec<Self::Report>>;
     async fn publish(&self, publisher: Arc<T>, report: Self::Report) -> Result<()>;
 }
 
@@ -391,9 +392,9 @@ impl<'a> TransferReportGenerator<'a> {
     }
 }
 
-pub struct TransferReportRaw {
-    all: String,
-    summary: String,
+pub enum TransferReportRaw {
+    All(String),
+    Summary(String),
 }
 
 #[async_trait]
@@ -424,7 +425,7 @@ where
             Ok(None)
         }
     }
-    async fn generate(&self, data: &Self::Data) -> Result<Self::Report> {
+    async fn generate(&self, data: &Self::Data) -> Result<Vec<Self::Report>> {
         let contexts = self.contexts.read().await;
 
         // List all transfers.
@@ -473,10 +474,10 @@ where
             ))
         }
 
-        Ok(TransferReportRaw {
-            all: raw_all,
-            summary: raw_summary,
-        })
+        Ok(vec![
+            TransferReportRaw::All(raw_all),
+            TransferReportRaw::Summary(raw_summary),
+        ])
     }
     async fn publish(&self, publisher: Arc<T>, report: Self::Report) -> Result<()> {
         publisher
