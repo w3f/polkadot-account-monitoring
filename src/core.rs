@@ -364,7 +364,7 @@ impl Publisher for GoogleDrive {
     async fn upload_data(&self, info: Self::Info, data: Self::Data) -> Result<()> {
         self.drive
             .upload_to_cloud_storage(
-                &data.bucket,
+                &data.bucket.unwrap(),
                 &data.name,
                 &data.mime_type,
                 &data.body,
@@ -378,12 +378,33 @@ impl Publisher for GoogleDrive {
 
 impl From<TransferReportRaw> for StoragePayload {
     fn from(val: TransferReportRaw) -> Self {
-        unimplemented!()
+        use TransferReportRaw::*;
+
+        match val {
+            All(content) => {
+                StoragePayload {
+                    bucket: None,
+                    name: "report_transfer_all".to_string(),
+                    mime_type: "application/vnd.google-apps.document".to_string(),
+                    body: content.into_bytes(),
+                    is_public: false,
+                }
+            }
+            Summary(content) => {
+                StoragePayload {
+                    bucket: None,
+                    name: "report_transfer_summary".to_string(),
+                    mime_type: "application/vnd.google-apps.document".to_string(),
+                    body: content.into_bytes(),
+                    is_public: false,
+                }
+            }
+        }
     }
 }
 
 pub struct StoragePayload {
-    bucket: String,
+    bucket: Option<String>,
     name: String,
     mime_type: String,
     body: Vec<u8>,
