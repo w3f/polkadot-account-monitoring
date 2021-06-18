@@ -9,6 +9,7 @@ use std::marker::PhantomData;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tokio::time::{sleep, Duration};
+use yup_oauth2::{read_service_account_key, ServiceAccountAuthenticator};
 
 const ROW_AMOUNT: usize = 10;
 const FAILED_TASK_SLEEP: u64 = 30;
@@ -356,6 +357,24 @@ pub struct GoogleDrive {
     drive: RawGoogleDrive,
 }
 
+impl GoogleDrive {
+    pub async fn new(path: &str) -> Result<Self> {
+        let key = read_service_account_key(path).await?;
+        let auth = ServiceAccountAuthenticator::builder(key).build().await?;
+        let token = auth.token(&["https://www.googleapis.com/auth/drive"]).await?;
+
+        if token.as_str().is_empty() {
+            return Err(anyhow!("returned Google auth token is invalid"))
+        }
+
+        Ok(
+            GoogleDrive {
+                drive: RawGoogleDrive::new(token)
+            }
+        )
+    }
+}
+
 #[async_trait]
 impl Publisher for GoogleDrive {
     type Data = StoragePayload;
@@ -577,5 +596,11 @@ mod tests {
         service.add_contexts(contexts).await;
         service.run_fetcher::<RewardsSlashesFetcher>().await;
         service.wait_blocking().await;
+    }
+
+    #[tokio::test]
+    #[ignore]
+    async fn google_drive_init() {
+        let _ = GoogleDrive::new("config/credentials.json").await.unwrap();
     }
 }
