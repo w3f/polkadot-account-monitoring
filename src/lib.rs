@@ -194,6 +194,7 @@ mod tests {
         .unwrap()
     }
 
+    // TODO: Rename this
     pub async fn generator() -> DatabaseReader {
         let random: u32 = thread_rng().gen_range(u32::MIN..u32::MAX);
         DatabaseReader::new(

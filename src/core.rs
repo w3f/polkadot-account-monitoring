@@ -279,7 +279,7 @@ impl ReportGenerator {
     pub async fn add_contexts(&mut self, mut contexts: Vec<Context>) {
         self.contexts.write().await.append(&mut contexts);
     }
-    async fn run_generator<T, P>(&self, generator: T, publisher: P, info: <P as Publisher>::Info)
+    async fn run_generator<T, P>(&self, mut generator: T, publisher: P, info: <P as Publisher>::Info)
     where
         T: 'static + Send + Sync + GenerateReport<P>,
         P: 'static + Send + Sync + Publisher,
@@ -310,6 +310,8 @@ impl ReportGenerator {
             }
         }
 
+        generator.set_context(self.db.clone(), Arc::clone(&self.contexts));
+
         let publisher = Arc::new(publisher);
         tokio::spawn(async move {
             loop {
@@ -335,6 +337,7 @@ trait GenerateReport<T: Publisher> {
     type Report;
 
     fn name() -> &'static str;
+    fn set_context(&mut self, db: DatabaseReader, contexts: Arc<RwLock<Vec<Context>>>);
     async fn fetch_data(&self) -> Result<Option<Self::Data>>;
     async fn generate(&self, data: &Self::Data) -> Result<Vec<Self::Report>>;
     async fn publish(
@@ -361,17 +364,17 @@ impl GoogleDrive {
     pub async fn new(path: &str) -> Result<Self> {
         let key = read_service_account_key(path).await?;
         let auth = ServiceAccountAuthenticator::builder(key).build().await?;
-        let token = auth.token(&["https://www.googleapis.com/auth/drive"]).await?;
+        let token = auth
+            .token(&["https://www.googleapis.com/auth/drive"])
+            .await?;
 
         if token.as_str().is_empty() {
-            return Err(anyhow!("returned Google auth token is invalid"))
+            return Err(anyhow!("returned Google auth token is invalid"));
         }
 
-        Ok(
-            GoogleDrive {
-                drive: RawGoogleDrive::new(token)
-            }
-        )
+        Ok(GoogleDrive {
+            drive: RawGoogleDrive::new(token),
+        })
     }
 }
 
@@ -405,22 +408,18 @@ impl From<TransferReportRaw> for StoragePayload {
         use TransferReportRaw::*;
 
         match val {
-            All(content) => {
-                StoragePayload {
-                    name: "report_transfer_all".to_string(),
-                    mime_type: "application/vnd.google-apps.document".to_string(),
-                    body: content.into_bytes(),
-                    is_public: false,
-                }
-            }
-            Summary(content) => {
-                StoragePayload {
-                    name: "report_transfer_summary".to_string(),
-                    mime_type: "application/vnd.google-apps.document".to_string(),
-                    body: content.into_bytes(),
-                    is_public: false,
-                }
-            }
+            All(content) => StoragePayload {
+                name: "report_transfer_all".to_string(),
+                mime_type: "application/vnd.google-apps.document".to_string(),
+                body: content.into_bytes(),
+                is_public: false,
+            },
+            Summary(content) => StoragePayload {
+                name: "report_transfer_summary".to_string(),
+                mime_type: "application/vnd.google-apps.document".to_string(),
+                body: content.into_bytes(),
+                is_public: false,
+            },
         }
     }
 }
@@ -435,18 +434,18 @@ pub struct StoragePayload {
 pub struct TransferReportGenerator<'a> {
     report_range: u64,
     last_report: Option<Timestamp>,
-    reader: DatabaseReader,
-    contexts: Arc<RwLock<Vec<Context>>>,
+    reader: Option<DatabaseReader>,
+    contexts: Option<Arc<RwLock<Vec<Context>>>>,
     _p: PhantomData<&'a ()>,
 }
 
 impl<'a> TransferReportGenerator<'a> {
-    pub fn new(db: DatabaseReader, report_range: u64, contexts: Arc<RwLock<Vec<Context>>>) -> Self {
+    pub fn new(report_range: u64) -> Self {
         TransferReportGenerator {
             report_range: report_range,
             last_report: None,
-            reader: db,
-            contexts: contexts,
+            reader: None,
+            contexts: None,
             _p: PhantomData,
         }
     }
@@ -470,14 +469,20 @@ where
     fn name() -> &'static str {
         "TransferReportGenerator"
     }
+    fn set_context(&mut self, db: DatabaseReader, contexts: Arc<RwLock<Vec<Context>>>) {
+        self.reader = None;
+        self.contexts = None;
+    }
     async fn fetch_data(&self) -> Result<Option<Self::Data>> {
         let now = Timestamp::now();
         let last_report = self.last_report.unwrap_or(Timestamp::from(0));
 
         if last_report < (now - Timestamp::from(self.report_range)) {
-            let contexts = self.contexts.read().await;
+            let contexts = self.contexts.as_ref().unwrap().read().await;
             let data = self
                 .reader
+                .as_ref()
+                .unwrap()
                 .fetch_transfers(contexts.as_slice(), last_report, now)
                 .await?;
 
@@ -487,7 +492,7 @@ where
         }
     }
     async fn generate(&self, data: &Self::Data) -> Result<Vec<Self::Report>> {
-        let contexts = self.contexts.read().await;
+        let contexts = self.contexts.as_ref().unwrap().read().await;
 
         // List all transfers.
         let mut raw_all =
@@ -584,7 +589,7 @@ mod tests {
     async fn live_run_reward_slash_fetcher() {
         init();
 
-        info!("Running live test for transfer fetcher");
+        info!("Running live test for reward/slash fetcher");
 
         let db = db().await;
 
@@ -600,7 +605,23 @@ mod tests {
 
     #[tokio::test]
     #[ignore]
-    async fn google_drive_init() {
+    async fn live_google_drive_init() {
         let _ = GoogleDrive::new("config/credentials.json").await.unwrap();
+    }
+
+    #[tokio::test]
+    #[ignore]
+    async fn live_transfer_report_generator() {
+        init();
+
+        info!("Running live test for transfer fetcher");
+
+        let db = generator().await;
+
+        let contexts = vec![Context::from("")];
+
+        let mut service = ReportGenerator::new(db);
+        service.add_contexts(contexts).await;
+        //service.run_generator(generator, publisher, info)
     }
 }
