@@ -278,21 +278,30 @@ impl ReportGenerator {
     pub async fn add_contexts(&mut self, mut contexts: Vec<Context>) {
         self.contexts.write().await.append(&mut contexts);
     }
-    async fn run_generator<T, P>(&self, generator: T, publisher: P)
+    async fn run_generator<T, P>(&self, generator: T, publisher: P, info: <P as Publisher>::Info)
     where
         T: 'static + Send + Sync + GenerateReport<P>,
-        P: 'static + Send + Sync,
+        P: 'static + Send + Sync + Publisher,
         <T as GenerateReport<P>>::Data: Send + Sync,
         <T as GenerateReport<P>>::Report: Send + Sync,
+        <P as Publisher>::Info: Send + Sync + Clone,
     {
-        async fn local<T, P>(generator: &T, publisher: Arc<P>) -> Result<()>
+        async fn local<T, P>(
+            generator: &T,
+            publisher: Arc<P>,
+            info: <P as Publisher>::Info,
+        ) -> Result<()>
         where
+            P: 'static + Send + Sync + Publisher,
             T: 'static + Send + Sync + GenerateReport<P>,
+            <P as Publisher>::Info: Send + Sync + Clone,
         {
             loop {
                 if let Some(data) = generator.fetch_data().await? {
                     for report in generator.generate(&data).await? {
-                        generator.publish(Arc::clone(&publisher), report).await?;
+                        generator
+                            .publish(Arc::clone(&publisher), info.clone(), report)
+                            .await?;
                     }
                 }
 
@@ -303,7 +312,9 @@ impl ReportGenerator {
         let publisher = Arc::new(publisher);
         tokio::spawn(async move {
             loop {
-                if let Err(err) = local::<T, P>(&generator, Arc::clone(&publisher)).await {
+                if let Err(err) =
+                    local::<T, P>(&generator, Arc::clone(&publisher), info.clone()).await
+                {
                     error!(
                         "Failed task while running report generator '{}': {:?}",
                         T::name(),
@@ -318,21 +329,27 @@ impl ReportGenerator {
 }
 
 #[async_trait]
-trait GenerateReport<T> {
+trait GenerateReport<T: Publisher> {
     type Data;
     type Report;
 
     fn name() -> &'static str;
     async fn fetch_data(&self) -> Result<Option<Self::Data>>;
     async fn generate(&self, data: &Self::Data) -> Result<Vec<Self::Report>>;
-    async fn publish(&self, publisher: Arc<T>, report: Self::Report) -> Result<()>;
+    async fn publish(
+        &self,
+        publisher: Arc<T>,
+        info: <T as Publisher>::Info,
+        report: Self::Report,
+    ) -> Result<()>;
 }
 
 #[async_trait]
 trait Publisher {
     type Data;
+    type Info;
 
-    async fn upload_data(&self, data: Self::Data) -> Result<()>;
+    async fn upload_data(&self, info: Self::Info, data: Self::Data) -> Result<()>;
 }
 
 pub struct GoogleDrive {
@@ -342,8 +359,9 @@ pub struct GoogleDrive {
 #[async_trait]
 impl Publisher for GoogleDrive {
     type Data = StoragePayload;
+    type Info = ();
 
-    async fn upload_data(&self, data: Self::Data) -> Result<()> {
+    async fn upload_data(&self, info: Self::Info, data: Self::Data) -> Result<()> {
         self.drive
             .upload_to_cloud_storage(
                 &data.bucket,
@@ -402,6 +420,7 @@ impl<'a, T> GenerateReport<T> for TransferReportGenerator<'a>
 where
     T: 'static + Send + Sync + Publisher,
     <T as Publisher>::Data: Send + Sync + From<TransferReportRaw>,
+    <T as Publisher>::Info: Send + Sync,
 {
     type Data = Vec<ContextData<'a, Transfer>>;
     type Report = TransferReportRaw;
@@ -479,9 +498,14 @@ where
             TransferReportRaw::Summary(raw_summary),
         ])
     }
-    async fn publish(&self, publisher: Arc<T>, report: Self::Report) -> Result<()> {
+    async fn publish(
+        &self,
+        publisher: Arc<T>,
+        info: <T as Publisher>::Info,
+        report: Self::Report,
+    ) -> Result<()> {
         publisher
-            .upload_data(<T as Publisher>::Data::from(report))
+            .upload_data(info, <T as Publisher>::Data::from(report))
             .await
             .map(|_| ())
             .map(|err| err.into())
