@@ -334,7 +334,7 @@ impl ReportGenerator {
             loop {
                 if let Some(data) = generator.fetch_data().await? {
                     for report in generator.generate(&data).await? {
-                        debug!("New report generated, uploading");
+                        debug!("New report generated, uploading...");
                         generator
                             .publish(Arc::clone(&publisher), info.clone(), report)
                             .await?;
@@ -401,7 +401,10 @@ impl GoogleDrive {
         let key = read_service_account_key(path).await?;
         let auth = ServiceAccountAuthenticator::builder(key).build().await?;
         let token = auth
-            .token(&["https://www.googleapis.com/auth/drive"])
+            .token(&[
+                "https://www.googleapis.com/auth/devstorage.read_write",
+                "https://www.googleapis.com/auth/drive",
+            ])
             .await?;
 
         if token.as_str().is_empty() {
@@ -473,6 +476,7 @@ impl From<TransferReportRaw> for GoogleStoragePayload {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct GoogleStoragePayload {
     name: String,
     mime_type: String,
