@@ -2,7 +2,7 @@ use crate::chain_api::{
     Nomination, NominationsPage, Response, RewardSlash, RewardsSlashesPage, Transfer, TransfersPage,
 };
 use crate::{BlockNumber, Context, ContextId, Result, Timestamp};
-use bson::{doc, to_bson, to_document, Bson, Document};
+use bson::{doc, from_document, to_bson, to_document, Bson, Document};
 use futures::StreamExt;
 use mongodb::options::UpdateOptions;
 use mongodb::{Client, Database as MongoDb};
@@ -247,27 +247,36 @@ impl DatabaseReader {
             .db
             .collection::<ContextData<Transfer>>(COLL_TRANSFER_RAW);
 
-        let mut cursor = coll.find(doc!{
-            "context_id": {
-                "$in": contexts.iter().map(|c| c.id()).collect::<Vec<ContextId>>().to_bson()?,
-            },
-            "$and": [
-                {
-                    "data.block_timestamp": {
-                        "$gte": from.to_bson()?
-                    }
-                },
-                {
-                    "data.block_timestamp": {
-                        "$lte": to.to_bson()?
-                    }
+        let mut cursor = coll.aggregate(vec![
+            doc!{
+                "$match": {
+                    "context_id": {
+                        "$in": contexts.iter().map(|c| c.id()).collect::<Vec<ContextId>>().to_bson()?,
+                    },
+                    "$and": [
+                        {
+                            "data.block_timestamp": {
+                                "$gte": from.to_bson()?
+                            }
+                        },
+                        {
+                            "data.block_timestamp": {
+                                "$lte": to.to_bson()?
+                            }
+                        }
+                    ]
                 }
-            ]
-        }, None).await?;
+            },
+            doc! {
+                "$sort": {
+                    "data.block_num": -1
+                }
+            }
+        ], None).await?;
 
         let mut transfers = vec![];
         while let Some(doc) = cursor.next().await {
-            transfers.push(doc?);
+            transfers.push(from_document(doc?)?);
         }
 
         Ok(transfers)

@@ -331,6 +331,7 @@ impl ReportGenerator {
             T: 'static + Send + Sync + GenerateReport<P>,
             <P as Publisher>::Info: Send + Sync + Clone,
         {
+            let mut first_run = true;
             loop {
                 if let Some(data) = generator.fetch_data().await? {
                     for report in generator.generate(&data).await? {
@@ -338,6 +339,11 @@ impl ReportGenerator {
                         generator
                             .publish(Arc::clone(&publisher), info.clone(), report)
                             .await?;
+                    }
+                } else {
+                    if first_run {
+                        warn!("No data found to generate report");
+                        first_run = false;
                     }
                 }
 
@@ -538,13 +544,16 @@ where
                 .fetch_transfers(contexts.as_slice(), last_report, now)
                 .await?;
 
-            if !data.is_empty() {
+            if data.is_empty() {
+                return Ok(None);
+            } else {
                 debug!(
                     "{}: Fetched {} entries from database",
                     <Self as GenerateReport<T>>::name(),
                     data.len()
                 );
             }
+
             // TODO: Update `last_report`
 
             Ok(Some(data))
@@ -567,7 +576,7 @@ where
 
         // List all transfers.
         let mut raw_all =
-            String::from("Block Number,Block Timestamp,From,To,Amount,Extrinsic Index,Success");
+            String::from("Block Number,Block Timestamp,From,To,Amount,Extrinsic Index,Success\n");
         // Create summary of all accounts.
         let mut summary: HashMap<Context, f64> = HashMap::new();
 
