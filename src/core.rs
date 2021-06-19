@@ -285,13 +285,14 @@ impl ReportGenerator {
             contexts: Default::default(),
         }
     }
+    // TODO: make this part of `new()` and wrap it in an `Arc`.
     pub async fn add_contexts(&mut self, mut contexts: Vec<Context>) {
         self.contexts.write().await.append(&mut contexts);
     }
     pub async fn run<P>(
         &mut self,
         module: ReportModule,
-        publisher: P,
+        publisher: Arc<P>,
         info: <P as Publisher>::Info,
     )
     where
@@ -311,7 +312,7 @@ impl ReportGenerator {
             }
         }
     }
-    async fn do_run<T, P>(&self, generator: T, publisher: P, info: <P as Publisher>::Info)
+    async fn do_run<T, P>(&self, generator: T, publisher: Arc<P>, info: <P as Publisher>::Info)
     where
         T: 'static + Send + Sync + GenerateReport<P>,
         P: 'static + Send + Sync + Publisher,
@@ -343,7 +344,6 @@ impl ReportGenerator {
             }
         }
 
-        let publisher = Arc::new(publisher);
         tokio::spawn(async move {
             loop {
                 if let Err(err) =
@@ -383,6 +383,7 @@ trait GenerateReport<T: Publisher> {
 #[async_trait]
 pub trait Publisher {
     type Data;
+    // TODO: Rename this to `Config`.
     type Info;
 
     async fn upload_data(&self, info: Self::Info, data: Self::Data) -> Result<()>;
@@ -432,7 +433,7 @@ impl Publisher for GoogleDrive {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct GoogleDriveUploadInfo {
-    bucket_name: String,
+    pub bucket_name: String,
 }
 
 impl From<TransferReportRaw> for GoogleStoragePayload {

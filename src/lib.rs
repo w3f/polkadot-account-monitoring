@@ -7,7 +7,7 @@ extern crate log;
 #[macro_use]
 extern crate anyhow;
 
-use self::core::{ScrapingModule, ScrapingService};
+use self::core::{ScrapingModule, ScrapingService, ReportModule, ReportGenerator, GoogleDrive, GoogleDriveUploadInfo};
 use anyhow::Error;
 use database::Database;
 use log::LevelFilter;
@@ -15,6 +15,7 @@ use std::fmt;
 use std::ops::Sub;
 use std::{borrow::Cow, fs::read_to_string};
 use tokio::time::{sleep, Duration};
+use std::sync::Arc;
 
 mod chain_api;
 mod core;
@@ -77,7 +78,10 @@ impl fmt::Display for Timestamp {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 struct Config {
     database: DatabaseConfig,
-    active_modules: Vec<ScrapingModule>,
+    fetcher_modules: Option<Vec<ScrapingModule>>,
+    report_modules: Option<Vec<ReportModule>>,
+    bucket_name: Option<String>,
+    gcp_secret_path: Option<String>,
     log_level: LevelFilter,
     accounts_file: String,
 }
@@ -148,9 +152,7 @@ pub async fn run() -> Result<()> {
 
     info!("Setting up database");
     let db = Database::new(&config.database.uri, &config.database.name).await?;
-
-    info!("Setting up scraping service");
-    let mut service = ScrapingService::new(db);
+    let reader = db.reader();
 
     let account_count = accounts.len();
     if account_count == 0 {
@@ -159,10 +161,35 @@ pub async fn run() -> Result<()> {
         info!("Adding {} accounts to monitor", account_count)
     }
 
-    service.add_contexts(accounts).await;
+    if let Some(fetcher_modules) = config.fetcher_modules {
+        info!("Setting up scraping service");
+        let mut service = ScrapingService::new(db);
+        service.add_contexts(accounts.clone()).await;
 
-    for module in &config.active_modules {
-        service.run(module).await?;
+        for module in &fetcher_modules {
+            service.run(module).await?;
+        }
+    } else {
+        info!("No scraping modules are enabled");
+    }
+
+    info!("Setting up scraping service");
+    if let Some(report_modules) = config.report_modules {
+        info!("Setting up report generation service");
+        let mut service = ReportGenerator::new(reader);
+        service.add_contexts(accounts).await;
+
+        let drive_config = GoogleDriveUploadInfo {
+            bucket_name: config.bucket_name.ok_or(anyhow!("No bucket name defined"))?,
+        };
+
+        let drive = Arc::new(GoogleDrive::new(&config.gcp_secret_path.ok_or(anyhow!("No GCP secret path defined"))?).await?);
+
+        for module in report_modules {
+            service.run(module, Arc::clone(&drive), drive_config.clone()).await;
+        }
+    } else {
+        info!("No report generation modules are enabled");
     }
 
     wait_blocking().await;

@@ -218,8 +218,7 @@ impl Database {
 
         Ok(count)
     }
-    #[cfg(test)]
-    fn reader(&self) -> DatabaseReader {
+    pub fn reader(&self) -> DatabaseReader {
         DatabaseReader {
             db: self.db.clone(),
         }
