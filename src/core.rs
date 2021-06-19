@@ -260,6 +260,18 @@ impl<'a> ScrapingService<'a> {
     }
 }
 
+#[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ReportModule {
+    Transfer(ReportTransferConfig),
+}
+
+#[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub struct ReportTransferConfig {
+    report_range: u64,
+}
+
 pub struct ReportGenerator {
     db: DatabaseReader,
     contexts: Arc<RwLock<Vec<Context>>>,
@@ -275,12 +287,33 @@ impl ReportGenerator {
     pub async fn add_contexts(&mut self, mut contexts: Vec<Context>) {
         self.contexts.write().await.append(&mut contexts);
     }
-    async fn run_generator<T, P>(
-        &self,
-        mut generator: T,
+    pub async fn run<P>(
+        &mut self,
+        module: ReportModule,
         publisher: P,
         info: <P as Publisher>::Info,
-    ) where
+    ) -> Result<()>
+    where
+        P: 'static + Send + Sync + Publisher,
+        <P as Publisher>::Data: Send + Sync + From<TransferReportRaw>,
+        <P as Publisher>::Info: Send + Sync + Clone,
+    {
+        match module {
+            ReportModule::Transfer(config) => {
+                let generator = TransferReportGenerator::new(
+                    self.db.clone(),
+                    Arc::clone(&self.contexts),
+                    config.report_range,
+                );
+
+                self.do_run(generator, publisher, info).await;
+            }
+        }
+
+        Ok(())
+    }
+    async fn do_run<T, P>(&self, generator: T, publisher: P, info: <P as Publisher>::Info)
+    where
         T: 'static + Send + Sync + GenerateReport<P>,
         P: 'static + Send + Sync + Publisher,
         <T as GenerateReport<P>>::Data: Send + Sync,
@@ -310,8 +343,6 @@ impl ReportGenerator {
             }
         }
 
-        generator.set_context(self.db.clone(), Arc::clone(&self.contexts));
-
         let publisher = Arc::new(publisher);
         tokio::spawn(async move {
             loop {
@@ -335,9 +366,10 @@ impl ReportGenerator {
 trait GenerateReport<T: Publisher> {
     type Data;
     type Report;
+    type Config;
 
     fn name() -> &'static str;
-    fn set_context(&mut self, db: DatabaseReader, contexts: Arc<RwLock<Vec<Context>>>);
+    fn new(db: DatabaseReader, contexts: Arc<RwLock<Vec<Context>>>, config: Self::Config) -> Self;
     async fn fetch_data(&self) -> Result<Option<Self::Data>>;
     async fn generate(&self, data: &Self::Data) -> Result<Vec<Self::Report>>;
     async fn publish(
@@ -440,18 +472,18 @@ pub enum TransferReportRaw {
 pub struct TransferReportGenerator<'a> {
     report_range: u64,
     last_report: Option<Timestamp>,
-    reader: Option<DatabaseReader>,
-    contexts: Option<Arc<RwLock<Vec<Context>>>>,
+    reader: DatabaseReader,
+    contexts: Arc<RwLock<Vec<Context>>>,
     _p: PhantomData<&'a ()>,
 }
 
 impl<'a> TransferReportGenerator<'a> {
-    pub fn new(report_range: u64) -> Self {
+    pub fn new(db: DatabaseReader, contexts: Arc<RwLock<Vec<Context>>>, report_range: u64) -> Self {
         TransferReportGenerator {
             report_range: report_range,
             last_report: None,
-            reader: None,
-            contexts: None,
+            reader: db,
+            contexts: contexts,
             _p: PhantomData,
         }
     }
@@ -466,24 +498,22 @@ where
 {
     type Data = Vec<ContextData<'a, Transfer>>;
     type Report = TransferReportRaw;
+    type Config = ReportTransferConfig;
 
     fn name() -> &'static str {
         "TransferReportGenerator"
     }
-    fn set_context(&mut self, db: DatabaseReader, contexts: Arc<RwLock<Vec<Context>>>) {
-        self.reader = Some(db);
-        self.contexts = Some(contexts);
+    fn new(db: DatabaseReader, contexts: Arc<RwLock<Vec<Context>>>, config: Self::Config) -> Self {
+        Self::new(db, contexts, config.report_range)
     }
     async fn fetch_data(&self) -> Result<Option<Self::Data>> {
         let now = Timestamp::now();
         let last_report = self.last_report.unwrap_or(Timestamp::from(0));
 
         if last_report < (now - Timestamp::from(self.report_range)) {
-            let contexts = self.contexts.as_ref().unwrap().read().await;
+            let contexts = self.contexts.read().await;
             let data = self
                 .reader
-                .as_ref()
-                .unwrap()
                 .fetch_transfers(contexts.as_slice(), last_report, now)
                 .await?;
 
@@ -494,10 +524,10 @@ where
     }
     async fn generate(&self, data: &Self::Data) -> Result<Vec<Self::Report>> {
         if data.is_empty() {
-            return Ok(vec![])
+            return Ok(vec![]);
         }
 
-        let contexts = self.contexts.as_ref().unwrap().read().await;
+        let contexts = self.contexts.read().await;
 
         // List all transfers.
         let mut raw_all =
@@ -640,9 +670,7 @@ mod tests {
             .await
             .unwrap();
 
-        let contexts = vec![Context::from(
-            "",
-        )];
+        let contexts = vec![Context::from("")];
         let generator = TransferReportGenerator::new(86400);
         let publisher = StdOut;
 
