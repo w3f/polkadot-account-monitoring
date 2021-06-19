@@ -121,7 +121,7 @@ impl DataInfo for Response<NominationsPage> {
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum Module {
+pub enum ScrapingModule {
     Transfer,
     RewardsSlashes,
     Nominations,
@@ -131,7 +131,7 @@ pub struct ScrapingService<'a> {
     db: Database,
     api: Arc<ChainApi>,
     contexts: Arc<RwLock<Vec<Context>>>,
-    running: HashSet<&'a Module>,
+    running: HashSet<&'a ScrapingModule>,
 }
 
 impl<'a> ScrapingService<'a> {
@@ -146,7 +146,7 @@ impl<'a> ScrapingService<'a> {
     pub async fn add_contexts(&mut self, mut contexts: Vec<Context>) {
         self.contexts.write().await.append(&mut contexts);
     }
-    pub async fn run(&mut self, module: &'a Module) -> Result<()> {
+    pub async fn run(&mut self, module: &'a ScrapingModule) -> Result<()> {
         if self.running.contains(module) {
             return Err(anyhow!(
                 "configuration contains the same module multiple times"
@@ -156,9 +156,9 @@ impl<'a> ScrapingService<'a> {
         self.running.insert(module);
 
         match module {
-            Module::Transfer => self.run_fetcher::<TransferFetcher>().await,
-            Module::RewardsSlashes => self.run_fetcher::<RewardsSlashesFetcher>().await,
-            Module::Nominations => self.run_fetcher::<NominationsFetcher>().await,
+            ScrapingModule::Transfer => self.run_fetcher::<TransferFetcher>().await,
+            ScrapingModule::RewardsSlashes => self.run_fetcher::<RewardsSlashesFetcher>().await,
+            ScrapingModule::Nominations => self.run_fetcher::<NominationsFetcher>().await,
         }
 
         Ok(())

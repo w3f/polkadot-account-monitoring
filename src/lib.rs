@@ -7,7 +7,7 @@ extern crate log;
 #[macro_use]
 extern crate anyhow;
 
-use self::core::{Module, ScrapingService};
+use self::core::{ScrapingModule, ScrapingService};
 use anyhow::Error;
 use database::Database;
 use log::LevelFilter;
@@ -77,7 +77,7 @@ impl fmt::Display for Timestamp {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 struct Config {
     database: DatabaseConfig,
-    active_modules: Vec<Module>,
+    active_modules: Vec<ScrapingModule>,
     log_level: LevelFilter,
     accounts_file: String,
 }
