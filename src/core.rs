@@ -294,8 +294,7 @@ impl ReportGenerator {
         module: ReportModule,
         publisher: Arc<P>,
         info: <P as Publisher>::Info,
-    )
-    where
+    ) where
         P: 'static + Send + Sync + Publisher,
         <P as Publisher>::Data: Send + Sync + From<TransferReportRaw>,
         <P as Publisher>::Info: Send + Sync + Clone,
@@ -681,7 +680,9 @@ mod tests {
 
         let mut service = ReportGenerator::new(db);
         service.add_contexts(contexts).await;
-        service.run(ReportModule::Transfer(config), publisher, ()).await;
+        service
+            .run(ReportModule::Transfer(config), publisher, ())
+            .await;
         wait_blocking().await;
     }
 }

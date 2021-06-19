@@ -7,15 +7,18 @@ extern crate log;
 #[macro_use]
 extern crate anyhow;
 
-use self::core::{ScrapingModule, ScrapingService, ReportModule, ReportGenerator, GoogleDrive, GoogleDriveUploadInfo};
+use self::core::{
+    GoogleDrive, GoogleDriveUploadInfo, ReportGenerator, ReportModule, ScrapingModule,
+    ScrapingService,
+};
 use anyhow::Error;
 use database::Database;
 use log::LevelFilter;
 use std::fmt;
 use std::ops::Sub;
+use std::sync::Arc;
 use std::{borrow::Cow, fs::read_to_string};
 use tokio::time::{sleep, Duration};
-use std::sync::Arc;
 
 mod chain_api;
 mod core;
@@ -78,12 +81,33 @@ impl fmt::Display for Timestamp {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 struct Config {
     database: DatabaseConfig,
-    fetcher_modules: Option<Vec<ScrapingModule>>,
-    report_modules: Option<Vec<ReportModule>>,
-    bucket_name: Option<String>,
-    gcp_secret_path: Option<String>,
+    collection: Option<CollectionConfig>,
+    report: Option<ReportConfig>,
     log_level: LevelFilter,
     accounts_file: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+struct CollectionConfig {
+    modules: Vec<ScrapingModule>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+struct ReportConfig {
+    modules: Vec<ReportModule>,
+    publisher: PublisherConfig,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case", tag = "type", content = "config")]
+enum PublisherConfig {
+    GoogleDrive(GoogleDriveConfig),
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+struct GoogleDriveConfig {
+    bucket_name: String,
+    gcp_secret_path: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -161,12 +185,12 @@ pub async fn run() -> Result<()> {
         info!("Adding {} accounts to monitor", account_count)
     }
 
-    if let Some(fetcher_modules) = config.fetcher_modules {
+    if let Some(coll_config) = config.collection {
         info!("Setting up scraping service");
         let mut service = ScrapingService::new(db);
         service.add_contexts(accounts.clone()).await;
 
-        for module in &fetcher_modules {
+        for module in &coll_config.modules {
             service.run(module).await?;
         }
     } else {
@@ -174,19 +198,28 @@ pub async fn run() -> Result<()> {
     }
 
     info!("Setting up scraping service");
-    if let Some(report_modules) = config.report_modules {
+    if let Some(report_config) = config.report {
         info!("Setting up report generation service");
         let mut service = ReportGenerator::new(reader);
         service.add_contexts(accounts).await;
 
-        let drive_config = GoogleDriveUploadInfo {
-            bucket_name: config.bucket_name.ok_or(anyhow!("No bucket name defined"))?,
+        let (publisher, publisher_config) = match report_config.publisher {
+            PublisherConfig::GoogleDrive(config) => {
+                let drive_config = GoogleDriveUploadInfo {
+                    bucket_name: config.bucket_name,
+                };
+
+                (
+                    Arc::new(GoogleDrive::new(&config.gcp_secret_path).await?),
+                    drive_config,
+                )
+            }
         };
 
-        let drive = Arc::new(GoogleDrive::new(&config.gcp_secret_path.ok_or(anyhow!("No GCP secret path defined"))?).await?);
-
-        for module in report_modules {
-            service.run(module, Arc::clone(&drive), drive_config.clone()).await;
+        for module in report_config.modules {
+            service
+                .run(module, Arc::clone(&publisher), publisher_config.clone())
+                .await;
         }
     } else {
         info!("No report generation modules are enabled");
