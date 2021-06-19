@@ -380,7 +380,7 @@ impl GoogleDrive {
 
 #[async_trait]
 impl Publisher for GoogleDrive {
-    type Data = StoragePayload;
+    type Data = GoogleStoragePayload;
     type Info = GoogleDriveUploadInfo;
 
     async fn upload_data(&self, info: Self::Info, data: Self::Data) -> Result<()> {
@@ -403,19 +403,19 @@ pub struct GoogleDriveUploadInfo {
     bucket_name: String,
 }
 
-impl From<TransferReportRaw> for StoragePayload {
+impl From<TransferReportRaw> for GoogleStoragePayload {
     fn from(val: TransferReportRaw) -> Self {
         use TransferReportRaw::*;
 
         match val {
-            All(content) => StoragePayload {
-                name: "report_transfer_all".to_string(),
+            All(content) => GoogleStoragePayload {
+                name: "report_transfer_all.csv".to_string(),
                 mime_type: "application/vnd.google-apps.document".to_string(),
                 body: content.into_bytes(),
                 is_public: false,
             },
-            Summary(content) => StoragePayload {
-                name: "report_transfer_summary".to_string(),
+            Summary(content) => GoogleStoragePayload {
+                name: "report_transfer_summary.csv".to_string(),
                 mime_type: "application/vnd.google-apps.document".to_string(),
                 body: content.into_bytes(),
                 is_public: false,
@@ -424,7 +424,7 @@ impl From<TransferReportRaw> for StoragePayload {
     }
 }
 
-pub struct StoragePayload {
+pub struct GoogleStoragePayload {
     name: String,
     mime_type: String,
     body: Vec<u8>,
