@@ -14,6 +14,7 @@ use log::LevelFilter;
 use std::fmt;
 use std::ops::Sub;
 use std::{borrow::Cow, fs::read_to_string};
+use tokio::time::{sleep, Duration};
 
 mod chain_api;
 mod core;
@@ -164,7 +165,7 @@ pub async fn run() -> Result<()> {
         service.run(module).await?;
     }
 
-    service.wait_blocking().await;
+    wait_blocking().await;
 
     Ok(())
 }
@@ -237,6 +238,12 @@ mod tests {
                 description: "".to_string(),
             }
         }
+    }
+}
+
+async fn wait_blocking() {
+    loop {
+        sleep(Duration::from_secs(u64::MAX)).await;
     }
 }
 

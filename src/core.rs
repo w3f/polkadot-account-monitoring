@@ -257,11 +257,6 @@ impl<'a> ScrapingService<'a> {
             }
         });
     }
-    pub async fn wait_blocking(&self) {
-        loop {
-            sleep(Duration::from_secs(u64::MAX)).await;
-        }
-    }
 }
 
 pub struct ReportGenerator {
@@ -279,8 +274,12 @@ impl ReportGenerator {
     pub async fn add_contexts(&mut self, mut contexts: Vec<Context>) {
         self.contexts.write().await.append(&mut contexts);
     }
-    async fn run_generator<T, P>(&self, mut generator: T, publisher: P, info: <P as Publisher>::Info)
-    where
+    async fn run_generator<T, P>(
+        &self,
+        mut generator: T,
+        publisher: P,
+        info: <P as Publisher>::Info,
+    ) where
         T: 'static + Send + Sync + GenerateReport<P>,
         P: 'static + Send + Sync + Publisher,
         <T as GenerateReport<P>>::Data: Send + Sync,
@@ -562,8 +561,21 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tests::{db, init};
+    use crate::tests::{db, generator, init};
+    use crate::wait_blocking;
     use std::vec;
+
+    struct StdOut;
+
+    #[async_trait]
+    impl Publisher for StdOut {
+        type Data = TransferReportRaw;
+        type Info = ();
+
+        async fn upload_data(&self, info: Self::Info, data: Self::Data) -> Result<()> {
+            unimplemented!()
+        }
+    }
 
     #[tokio::test]
     #[ignore]
@@ -581,7 +593,7 @@ mod tests {
         let mut service = ScrapingService::new(db);
         service.add_contexts(contexts).await;
         service.run_fetcher::<TransferFetcher>().await;
-        service.wait_blocking().await;
+        wait_blocking().await;
     }
 
     #[tokio::test]
@@ -600,7 +612,7 @@ mod tests {
         let mut service = ScrapingService::new(db);
         service.add_contexts(contexts).await;
         service.run_fetcher::<RewardsSlashesFetcher>().await;
-        service.wait_blocking().await;
+        wait_blocking().await;
     }
 
     #[tokio::test]
@@ -619,9 +631,12 @@ mod tests {
         let db = generator().await;
 
         let contexts = vec![Context::from("")];
+        let generator = TransferReportGenerator::new(86400);
+        let publisher = StdOut;
 
         let mut service = ReportGenerator::new(db);
         service.add_contexts(contexts).await;
-        //service.run_generator(generator, publisher, info)
+        service.run_generator(generator, publisher, ()).await;
+        wait_blocking().await;
     }
 }
