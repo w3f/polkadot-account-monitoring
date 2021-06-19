@@ -247,6 +247,7 @@ impl<'a> ScrapingService<'a> {
         let fetcher = T::new(self.db.clone(), Arc::clone(&self.api));
         let contexts = Arc::clone(&self.contexts);
         tokio::spawn(async move {
+            info!("{}: Running event loop...", T::name());
             loop {
                 if let Err(err) = local(&fetcher, &contexts).await {
                     error!(
@@ -345,6 +346,7 @@ impl ReportGenerator {
         }
 
         tokio::spawn(async move {
+            info!("{}: Running event loop...", T::name());
             loop {
                 if let Err(err) =
                     local::<T, P>(&generator, Arc::clone(&publisher), info.clone()).await
