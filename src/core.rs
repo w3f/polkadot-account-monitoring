@@ -127,6 +127,7 @@ pub enum ScrapingModule {
     Nominations,
 }
 
+// TODO: lifetime annotation required?
 pub struct ScrapingService<'a> {
     db: Database,
     api: Arc<ChainApi>,
@@ -292,7 +293,7 @@ impl ReportGenerator {
         module: ReportModule,
         publisher: P,
         info: <P as Publisher>::Info,
-    ) -> Result<()>
+    )
     where
         P: 'static + Send + Sync + Publisher,
         <P as Publisher>::Data: Send + Sync + From<TransferReportRaw>,
@@ -309,8 +310,6 @@ impl ReportGenerator {
                 self.do_run(generator, publisher, info).await;
             }
         }
-
-        Ok(())
     }
     async fn do_run<T, P>(&self, generator: T, publisher: P, info: <P as Publisher>::Info)
     where
@@ -333,6 +332,7 @@ impl ReportGenerator {
             loop {
                 if let Some(data) = generator.fetch_data().await? {
                     for report in generator.generate(&data).await? {
+                        debug!("New report generated, uploading");
                         generator
                             .publish(Arc::clone(&publisher), info.clone(), report)
                             .await?;
@@ -381,7 +381,7 @@ trait GenerateReport<T: Publisher> {
 }
 
 #[async_trait]
-trait Publisher {
+pub trait Publisher {
     type Data;
     type Info;
 
@@ -516,6 +516,8 @@ where
                 .reader
                 .fetch_transfers(contexts.as_slice(), last_report, now)
                 .await?;
+
+            // TODO: Update `last_report`
 
             Ok(Some(data))
         } else {
@@ -664,19 +666,21 @@ mod tests {
     async fn live_transfer_report_generator() {
         init();
 
-        info!("Running live test for transfer fetcher");
+        info!("Running live test for transfer report generator");
 
         let db = DatabaseReader::new("mongodb://localhost:27017/", "monitor")
             .await
             .unwrap();
 
         let contexts = vec![Context::from("")];
-        let generator = TransferReportGenerator::new(86400);
+        let config = ReportTransferConfig {
+            report_range: 86_400,
+        };
         let publisher = StdOut;
 
         let mut service = ReportGenerator::new(db);
         service.add_contexts(contexts).await;
-        service.run_generator(generator, publisher, ()).await;
+        service.run(ReportModule::Transfer(config), publisher, ()).await;
         wait_blocking().await;
     }
 }
