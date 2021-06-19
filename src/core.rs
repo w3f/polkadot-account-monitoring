@@ -146,6 +146,7 @@ impl<'a> ScrapingService<'a> {
     pub async fn add_contexts(&mut self, mut contexts: Vec<Context>) {
         self.contexts.write().await.append(&mut contexts);
     }
+    // TODO: Get rid fo this, use `run_fetcher` directly.
     pub async fn run(&mut self, module: &'a ScrapingModule) -> Result<()> {
         if self.running.contains(module) {
             return Err(anyhow!(
@@ -515,7 +516,7 @@ where
 
             let data = entry.data.to_owned();
             raw_all.push_str(&format!(
-                "{},{},{},{},{},{},{}",
+                "{},{},{},{},{},{},{}\n",
                 data.block_num,
                 data.block_timestamp,
                 data.from,
