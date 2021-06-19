@@ -264,7 +264,7 @@ impl<'a> ScrapingService<'a> {
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ReportModule {
-    Transfer(ReportTransferConfig),
+    Transfers(ReportTransferConfig),
 }
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
@@ -300,7 +300,7 @@ impl ReportGenerator {
         <P as Publisher>::Info: Send + Sync + Clone,
     {
         match module {
-            ReportModule::Transfer(config) => {
+            ReportModule::Transfers(config) => {
                 let generator = TransferReportGenerator::new(
                     self.db.clone(),
                     Arc::clone(&self.contexts),
@@ -681,7 +681,7 @@ mod tests {
         let mut service = ReportGenerator::new(db);
         service.add_contexts(contexts).await;
         service
-            .run(ReportModule::Transfer(config), publisher, ())
+            .run(ReportModule::Transfers(config), publisher, ())
             .await;
         wait_blocking().await;
     }

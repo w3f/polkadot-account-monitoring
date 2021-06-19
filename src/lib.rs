@@ -102,12 +102,13 @@ struct ReportConfig {
 #[serde(rename_all = "snake_case", tag = "type", content = "config")]
 enum PublisherConfig {
     GoogleDrive(GoogleDriveConfig),
+    // Open for future extensions.
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 struct GoogleDriveConfig {
     bucket_name: String,
-    gcp_secret_path: String,
+    credentials: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -210,7 +211,7 @@ pub async fn run() -> Result<()> {
                 };
 
                 (
-                    Arc::new(GoogleDrive::new(&config.gcp_secret_path).await?),
+                    Arc::new(GoogleDrive::new(&config.credentials).await?),
                     drive_config,
                 )
             }
