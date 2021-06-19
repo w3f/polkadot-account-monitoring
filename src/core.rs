@@ -430,6 +430,12 @@ pub struct StoragePayload {
     is_public: bool,
 }
 
+#[derive(Debug, Clone)]
+pub enum TransferReportRaw {
+    All(String),
+    Summary(String),
+}
+
 pub struct TransferReportGenerator<'a> {
     report_range: u64,
     last_report: Option<Timestamp>,
@@ -450,11 +456,6 @@ impl<'a> TransferReportGenerator<'a> {
     }
 }
 
-pub enum TransferReportRaw {
-    All(String),
-    Summary(String),
-}
-
 #[async_trait]
 impl<'a, T> GenerateReport<T> for TransferReportGenerator<'a>
 where
@@ -469,8 +470,8 @@ where
         "TransferReportGenerator"
     }
     fn set_context(&mut self, db: DatabaseReader, contexts: Arc<RwLock<Vec<Context>>>) {
-        self.reader = None;
-        self.contexts = None;
+        self.reader = Some(db);
+        self.contexts = Some(contexts);
     }
     async fn fetch_data(&self) -> Result<Option<Self::Data>> {
         let now = Timestamp::now();
@@ -491,13 +492,17 @@ where
         }
     }
     async fn generate(&self, data: &Self::Data) -> Result<Vec<Self::Report>> {
+        if data.is_empty() {
+            return Ok(vec![])
+        }
+
         let contexts = self.contexts.as_ref().unwrap().read().await;
 
         // List all transfers.
         let mut raw_all =
             String::from("Block Number,Block Timestamp,From,To,Amount,Extrinsic Index,Success");
         // Create summary of all accounts.
-        let mut summary: HashMap<Context, u64> = HashMap::new();
+        let mut summary: HashMap<Context, f64> = HashMap::new();
 
         for entry in data {
             // TODO: Improve performance here.
@@ -506,7 +511,7 @@ where
                 .find(|c| c.stash == entry.context_id.stash.clone().into_owned())
                 .ok_or(anyhow!("No context found while generating reports"))?;
 
-            let amount = entry.data.amount.parse::<u64>()?;
+            let amount = entry.data.amount.parse::<f64>()?;
 
             let data = entry.data.to_owned();
             raw_all.push_str(&format!(
@@ -561,6 +566,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::database::DatabaseReader;
     use crate::tests::{db, generator, init};
     use crate::wait_blocking;
     use std::vec;
@@ -573,7 +579,8 @@ mod tests {
         type Info = ();
 
         async fn upload_data(&self, info: Self::Info, data: Self::Data) -> Result<()> {
-            unimplemented!()
+            println!("REPORT {:?}", data);
+            Ok(())
         }
     }
 
@@ -628,9 +635,13 @@ mod tests {
 
         info!("Running live test for transfer fetcher");
 
-        let db = generator().await;
+        let db = DatabaseReader::new("mongodb://localhost:27017/", "monitor")
+            .await
+            .unwrap();
 
-        let contexts = vec![Context::from("")];
+        let contexts = vec![Context::from(
+            "",
+        )];
         let generator = TransferReportGenerator::new(86400);
         let publisher = StdOut;
 
