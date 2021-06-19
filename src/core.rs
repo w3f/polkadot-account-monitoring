@@ -7,13 +7,14 @@ use google_drive::GoogleDrive as RawGoogleDrive;
 use std::collections::{HashMap, HashSet};
 use std::marker::PhantomData;
 use std::sync::Arc;
-use tokio::sync::RwLock;
+use tokio::sync::{Mutex, RwLock};
 use tokio::time::{sleep, Duration};
 use yup_oauth2::{read_service_account_key, ServiceAccountAuthenticator};
 
 const ROW_AMOUNT: usize = 10;
 const FAILED_TASK_SLEEP: u64 = 30;
 const LOOP_INTERVAL: u64 = 300;
+const PUBLISHER_REQUEST_TIMEOUT: u64 = 1;
 
 pub struct TransferFetcher {
     db: Database,
@@ -262,7 +263,7 @@ impl<'a> ScrapingService<'a> {
 }
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
+#[serde(rename_all = "snake_case", tag = "type", content = "config")]
 pub enum ReportModule {
     Transfers(ReportTransferConfig),
 }
@@ -390,6 +391,7 @@ pub trait Publisher {
 
 pub struct GoogleDrive {
     drive: RawGoogleDrive,
+    guard_lock: Arc<Mutex<()>>,
 }
 
 impl GoogleDrive {
@@ -406,7 +408,18 @@ impl GoogleDrive {
 
         Ok(GoogleDrive {
             drive: RawGoogleDrive::new(token),
+            guard_lock: Default::default(),
         })
+    }
+    async fn time_guard(&self) {
+        let mutex = Arc::clone(&self.guard_lock);
+        let guard = mutex.lock_owned().await;
+
+        tokio::spawn(async move {
+            // Capture guard, drops after sleeping period;
+            let _ = guard;
+            sleep(Duration::from_secs(PUBLISHER_REQUEST_TIMEOUT)).await;
+        });
     }
 }
 
@@ -416,6 +429,8 @@ impl Publisher for GoogleDrive {
     type Info = GoogleDriveUploadInfo;
 
     async fn upload_data(&self, info: Self::Info, data: Self::Data) -> Result<()> {
+        self.time_guard().await;
+
         self.drive
             .upload_to_cloud_storage(
                 &info.bucket_name,
@@ -517,6 +532,13 @@ where
                 .fetch_transfers(contexts.as_slice(), last_report, now)
                 .await?;
 
+            if !data.is_empty() {
+                debug!(
+                    "{}: Fetched {} entries from database",
+                    <Self as GenerateReport<T>>::name(),
+                    data.len()
+                );
+            }
             // TODO: Update `last_report`
 
             Ok(Some(data))
@@ -528,6 +550,12 @@ where
         if data.is_empty() {
             return Ok(vec![]);
         }
+
+        debug!(
+            "{}: Generating reports of {} database entries",
+            <Self as GenerateReport<T>>::name(),
+            data.len()
+        );
 
         let contexts = self.contexts.read().await;
 
@@ -590,9 +618,11 @@ where
     ) -> Result<()> {
         publisher
             .upload_data(info, <T as Publisher>::Data::from(report))
-            .await
-            .map(|_| ())
-            .map(|err| err.into())
+            .await?;
+
+        info!("Uploaded new report");
+
+        Ok(())
     }
 }
 
@@ -602,6 +632,7 @@ mod tests {
     use crate::database::DatabaseReader;
     use crate::tests::{db, generator, init};
     use crate::wait_blocking;
+    use std::sync::Arc;
     use std::vec;
 
     struct StdOut;
@@ -676,7 +707,7 @@ mod tests {
         let config = ReportTransferConfig {
             report_range: 86_400,
         };
-        let publisher = StdOut;
+        let publisher = Arc::new(StdOut);
 
         let mut service = ReportGenerator::new(db);
         service.add_contexts(contexts).await;

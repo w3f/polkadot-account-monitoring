@@ -191,6 +191,7 @@ pub async fn run() -> Result<()> {
         let mut service = ScrapingService::new(db);
         service.add_contexts(accounts.clone()).await;
 
+        info!("Executing modules");
         for module in &coll_config.modules {
             service.run(module).await?;
         }
@@ -198,7 +199,6 @@ pub async fn run() -> Result<()> {
         info!("No scraping modules are enabled");
     }
 
-    info!("Setting up scraping service");
     if let Some(report_config) = config.report {
         info!("Setting up report generation service");
         let mut service = ReportGenerator::new(reader);
@@ -210,6 +210,8 @@ pub async fn run() -> Result<()> {
                     bucket_name: config.bucket_name,
                 };
 
+                info!("Initializing Google Drive connection");
+
                 (
                     Arc::new(GoogleDrive::new(&config.credentials).await?),
                     drive_config,
@@ -217,6 +219,7 @@ pub async fn run() -> Result<()> {
             }
         };
 
+        info!("Executing modules");
         for module in report_config.modules {
             service
                 .run(module, Arc::clone(&publisher), publisher_config.clone())
@@ -226,6 +229,7 @@ pub async fn run() -> Result<()> {
         info!("No report generation modules are enabled");
     }
 
+    info!("Setup completed");
     wait_blocking().await;
 
     Ok(())

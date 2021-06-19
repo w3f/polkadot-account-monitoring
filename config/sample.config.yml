@@ -1,8 +1,20 @@
+log_level: debug
+accounts_file: config/sample.accounts.yml
 database:
   uri: "mongodb://localhost:27017/"
   name: "monitor"
-active_modules:
-  - transfer
-  - rewards_slashes
-log_level: debug
-accounts_file: config/sample.accounts.yml
+# (optional): types of extrinsics to fetch from chain.
+collection:
+  modules:
+    - transfer
+    - rewards_slashes
+    - nominations
+# (optional): types of reports to generate
+report:
+  modules:
+    - transfers
+  publisher:
+    type: google_drive
+    config:
+      bucket_name: report-bucket
+      credentials: config/credentials.json
