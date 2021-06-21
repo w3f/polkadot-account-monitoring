@@ -1,19 +1,14 @@
 use super::GenerateReport;
 use crate::core::ReportTransferConfig;
-use crate::chain_api::{
-    ChainApi, NominationsPage, Response, RewardsSlashesPage, Transfer, TransfersPage,
-};
 use crate::publishing::GoogleStoragePayload;
-use crate::database::{ContextData, Database, DatabaseReader};
+use crate::database::{ContextData, DatabaseReader};
 use crate::{Context, Result, Timestamp};
+use crate::chain_api::Transfer;
 use crate::publishing::Publisher;
-use google_drive::GoogleDrive as RawGoogleDrive;
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap};
 use std::marker::PhantomData;
 use std::sync::Arc;
-use tokio::sync::{Mutex, RwLock};
-use tokio::time::{sleep, Duration};
-use yup_oauth2::{read_service_account_key, ServiceAccountAuthenticator};
+use tokio::sync::{RwLock};
 
 #[derive(Debug, Clone)]
 pub enum TransferReportRaw {

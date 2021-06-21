@@ -1,14 +1,8 @@
 use super::Publisher;
-use crate::chain_api::{
-    ChainApi, NominationsPage, Response, RewardsSlashesPage, Transfer, TransfersPage,
-};
-use crate::database::{ContextData, Database, DatabaseReader};
-use crate::{Context, Result, Timestamp};
+use crate::Result;
 use google_drive::GoogleDrive as RawGoogleDrive;
-use std::collections::{HashMap, HashSet};
-use std::marker::PhantomData;
 use std::sync::Arc;
-use tokio::sync::{Mutex, RwLock};
+use tokio::sync::{Mutex};
 use tokio::time::{sleep, Duration};
 use yup_oauth2::{read_service_account_key, ServiceAccountAuthenticator};
 

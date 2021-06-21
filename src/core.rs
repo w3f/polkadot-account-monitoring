@@ -1,17 +1,17 @@
 use crate::chain_api::{
-    ChainApi, NominationsPage, Response, RewardsSlashesPage, Transfer, TransfersPage,
+    ChainApi, NominationsPage, Response, RewardsSlashesPage, TransfersPage,
 };
-use crate::database::{ContextData, Database, DatabaseReader};
-use crate::{Context, Result, Timestamp};
+use crate::database::{Database, DatabaseReader};
+use crate::{Context, Result};
 use crate::publishing::Publisher;
 use crate::reporting::{GenerateReport, TransferReportGenerator, TransferReportRaw};
-use google_drive::GoogleDrive as RawGoogleDrive;
-use std::collections::{HashMap, HashSet};
-use std::marker::PhantomData;
+
+use std::collections::{HashSet};
+
 use std::sync::Arc;
-use tokio::sync::{Mutex, RwLock};
+use tokio::sync::{RwLock};
 use tokio::time::{sleep, Duration};
-use yup_oauth2::{read_service_account_key, ServiceAccountAuthenticator};
+
 
 const ROW_AMOUNT: usize = 10;
 const FAILED_TASK_SLEEP: u64 = 30;
@@ -376,7 +376,7 @@ impl ReportGenerator {
 mod tests {
     use super::*;
     use crate::database::DatabaseReader;
-    use crate::tests::{db, generator, init};
+    use crate::tests::{db, init};
     use crate::wait_blocking;
     use crate::publishing::GoogleDrive;
     use std::sync::Arc;
@@ -389,7 +389,7 @@ mod tests {
         type Data = TransferReportRaw;
         type Info = ();
 
-        async fn upload_data(&self, info: Self::Info, data: Self::Data) -> Result<()> {
+        async fn upload_data(&self, _info: Self::Info, data: Self::Data) -> Result<()> {
             println!("REPORT {:?}", data);
             Ok(())
         }

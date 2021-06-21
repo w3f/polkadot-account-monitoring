@@ -232,11 +232,6 @@ pub struct DatabaseReader {
 }
 
 impl DatabaseReader {
-    pub async fn new(uri: &str, db: &str) -> Result<Self> {
-        Ok(DatabaseReader {
-            db: Client::with_uri_str(uri).await?.database(db),
-        })
-    }
     pub async fn fetch_transfers<'a>(
         &self,
         contexts: &[Context],
@@ -343,7 +338,7 @@ impl DatabaseReader {
 mod tests {
     use super::*;
     use crate::chain_api::{Response, TransfersPage};
-    use crate::tests::{db, generator};
+    use crate::tests::{db};
     use crate::Context;
 
     #[tokio::test]
