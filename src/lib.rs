@@ -23,6 +23,8 @@ use tokio::time::{sleep, Duration};
 mod chain_api;
 mod core;
 mod database;
+mod publishing;
+mod reporting;
 
 pub type Result<T> = std::result::Result<T, Error>;
 
