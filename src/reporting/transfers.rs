@@ -1,14 +1,14 @@
 use super::GenerateReport;
-use crate::core::ReportTransferConfig;
-use crate::publishing::GoogleStoragePayload;
-use crate::database::{ContextData, DatabaseReader};
-use crate::{Context, Result, Timestamp};
 use crate::chain_api::Transfer;
+use crate::core::ReportTransferConfig;
+use crate::database::{ContextData, DatabaseReader};
+use crate::publishing::GoogleStoragePayload;
 use crate::publishing::Publisher;
-use std::collections::{HashMap};
+use crate::{Context, Result, Timestamp};
+use std::collections::HashMap;
 use std::marker::PhantomData;
 use std::sync::Arc;
-use tokio::sync::{RwLock};
+use tokio::sync::RwLock;
 
 #[derive(Debug, Clone)]
 pub enum TransferReportRaw {

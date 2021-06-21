@@ -1,13 +1,13 @@
-use crate::Result;
-use crate::publishing::Publisher;
 use crate::database::DatabaseReader;
+use crate::publishing::Publisher;
 use crate::Context;
-use tokio::sync::RwLock;
+use crate::Result;
 use std::sync::Arc;
+use tokio::sync::RwLock;
 
 mod transfers;
 
-pub use transfers::{TransferReportRaw, TransferReportGenerator};
+pub use transfers::{TransferReportGenerator, TransferReportRaw};
 
 // TODO: Is this type constraint required here?
 #[async_trait]

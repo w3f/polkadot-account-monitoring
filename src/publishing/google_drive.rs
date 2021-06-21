@@ -2,7 +2,7 @@ use super::Publisher;
 use crate::Result;
 use google_drive::GoogleDrive as RawGoogleDrive;
 use std::sync::Arc;
-use tokio::sync::{Mutex};
+use tokio::sync::Mutex;
 use tokio::time::{sleep, Duration};
 use yup_oauth2::{read_service_account_key, ServiceAccountAuthenticator};
 

@@ -344,7 +344,7 @@ impl DatabaseReader {
 mod tests {
     use super::*;
     use crate::chain_api::{Response, TransfersPage};
-    use crate::tests::{db};
+    use crate::tests::db;
     use crate::Context;
 
     #[tokio::test]

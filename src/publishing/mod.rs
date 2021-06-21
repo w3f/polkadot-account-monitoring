@@ -1,7 +1,7 @@
 use crate::Result;
 mod google_drive;
 
-pub use self::google_drive::{GoogleDrive, GoogleStoragePayload, GoogleDriveUploadInfo};
+pub use self::google_drive::{GoogleDrive, GoogleDriveUploadInfo, GoogleStoragePayload};
 
 #[async_trait]
 pub trait Publisher {

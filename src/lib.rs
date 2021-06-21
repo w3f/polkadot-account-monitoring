@@ -7,14 +7,11 @@ extern crate log;
 #[macro_use]
 extern crate anyhow;
 
-use self::core::{
-    ReportGenerator, ReportModule, ScrapingModule,
-    ScrapingService,
-};
-use publishing::{GoogleDrive, GoogleDriveUploadInfo};
+use self::core::{ReportGenerator, ReportModule, ScrapingModule, ScrapingService};
 use anyhow::Error;
 use database::Database;
 use log::LevelFilter;
+use publishing::{GoogleDrive, GoogleDriveUploadInfo};
 use std::fmt;
 use std::ops::Sub;
 use std::sync::Arc;

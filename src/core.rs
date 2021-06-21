@@ -1,17 +1,14 @@
-use crate::chain_api::{
-    ChainApi, NominationsPage, Response, RewardsSlashesPage, TransfersPage,
-};
+use crate::chain_api::{ChainApi, NominationsPage, Response, RewardsSlashesPage, TransfersPage};
 use crate::database::{Database, DatabaseReader};
-use crate::{Context, Result};
 use crate::publishing::Publisher;
 use crate::reporting::{GenerateReport, TransferReportGenerator, TransferReportRaw};
+use crate::{Context, Result};
 
-use std::collections::{HashSet};
+use std::collections::HashSet;
 
 use std::sync::Arc;
-use tokio::sync::{RwLock};
+use tokio::sync::RwLock;
 use tokio::time::{sleep, Duration};
-
 
 const ROW_AMOUNT: usize = 10;
 const FAILED_TASK_SLEEP: u64 = 30;
@@ -375,9 +372,9 @@ impl ReportGenerator {
 mod tests {
     use super::*;
     use crate::database::DatabaseReader;
+    use crate::publishing::GoogleDrive;
     use crate::tests::{db, init};
     use crate::wait_blocking;
-    use crate::publishing::GoogleDrive;
     use std::sync::Arc;
     use std::vec;
 
