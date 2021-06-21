@@ -8,9 +8,10 @@ extern crate log;
 extern crate anyhow;
 
 use self::core::{
-    GoogleDrive, GoogleDriveUploadInfo, ReportGenerator, ReportModule, ScrapingModule,
+    ReportGenerator, ReportModule, ScrapingModule,
     ScrapingService,
 };
+use publishing::{GoogleDrive, GoogleDriveUploadInfo};
 use anyhow::Error;
 use database::Database;
 use log::LevelFilter;
