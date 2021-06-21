@@ -232,6 +232,12 @@ pub struct DatabaseReader {
 }
 
 impl DatabaseReader {
+    #[cfg(test)]
+    pub async fn new(uri: &str, db: &str) -> Result<Self> {
+        Ok(DatabaseReader {
+            db: Client::with_uri_str(uri).await?.database(db),
+        })
+    }
     pub async fn fetch_transfers<'a>(
         &self,
         contexts: &[Context],

@@ -241,7 +241,7 @@ pub async fn run() -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::database::{Database, DatabaseReader};
+    use crate::database::Database;
     use log::LevelFilter;
     use rand::{thread_rng, Rng};
 
@@ -256,17 +256,6 @@ mod tests {
     pub async fn db() -> Database {
         let random: u32 = thread_rng().gen_range(u32::MIN..u32::MAX);
         Database::new(
-            "mongodb://localhost:27017/",
-            &format!("monitoring_test_{}", random),
-        )
-        .await
-        .unwrap()
-    }
-
-    // TODO: Rename this
-    pub async fn generator() -> DatabaseReader {
-        let random: u32 = thread_rng().gen_range(u32::MIN..u32::MAX);
-        DatabaseReader::new(
             "mongodb://localhost:27017/",
             &format!("monitoring_test_{}", random),
         )

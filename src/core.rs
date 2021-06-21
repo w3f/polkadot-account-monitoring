@@ -371,7 +371,6 @@ impl ReportGenerator {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
