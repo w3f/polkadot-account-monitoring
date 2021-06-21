@@ -9,6 +9,14 @@ mod transfers;
 
 pub use transfers::{TransferReportGenerator, TransferReportRaw};
 
+#[derive(Debug, Clone, Copy, Hash, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Occurrence {
+    Daily,
+    Weekly,
+    Monthly,
+}
+
 // TODO: Is this type constraint required here?
 #[async_trait]
 pub trait GenerateReport<T: Publisher> {

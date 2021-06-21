@@ -2,16 +2,22 @@ use crate::chain_api::{
     Nomination, NominationsPage, Response, RewardSlash, RewardsSlashesPage, Transfer, TransfersPage,
 };
 use crate::{BlockNumber, Context, ContextId, Result, Timestamp};
+use crate::core::ReportModuleId;
+use crate::reporting::Occurrence;
 use bson::{doc, from_document, to_bson, to_document, Bson, Document};
 use futures::StreamExt;
 use mongodb::options::UpdateOptions;
 use mongodb::{Client, Database as MongoDb};
 use serde::Serialize;
+use chrono::Utc;
+use chrono::offset::TimeZone;
 use std::borrow::Cow;
+use std::collections::{HashSet, HashMap};
 
 const COLL_TRANSFER_RAW: &'static str = "raw_transfers";
 const COLL_REWARD_SLASH_RAW: &'static str = "raw_rewards_slashes";
 const COLL_NOMINATIONS_RAW: &'static str = "raw_rewards_slashes";
+const COLL_REPORT_STATE: &'static str = "report_state";
 
 /// Convenience trait. Converts a value to BSON.
 trait ToBson {
@@ -338,6 +344,40 @@ impl DatabaseReader {
 
         Ok(validators)
     }
+    pub async fn log_occurrence(&self, module_id: ReportModuleId, occurrence: Occurrence) -> Result<()> {
+        let coll = self.db.collection::<OccurrenceLog>(COLL_REPORT_STATE);
+
+        let log = coll.find_one(doc! {
+            "type": "occurrence_log",
+        }, None).await?;
+
+        if let Some(mut log) = log {
+            log
+                .indexes
+                .entry(module_id)
+                .and_modify(|index| {
+
+                });
+        } else {
+
+        }
+
+        Ok(())
+    }
+}
+
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+struct OccurrenceLog {
+    #[serde(rename = "type")]
+    ty: String,
+    indexes: HashMap<ReportModuleId, OccurrenceIndex>,
+}
+
+#[derive(Default, Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
+struct OccurrenceIndex {
+    daily: u64,
+    weekly: u64,
+    monthly: u64,
 }
 
 #[cfg(test)]
