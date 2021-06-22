@@ -360,7 +360,11 @@ impl DatabaseReader {
             )
             .await?;
 
+        #[cfg(not(test))]
         let now = chrono::offset::Utc::today() - chrono::Duration::days(1);
+        #[cfg(test)]
+        let now = Utc.ymd(2021, 6, 22);
+
         if let Some(checkpoints) = checkpoints {
             if let Some(index) = checkpoints.indexes.get(&module_id) {
                 let offset = match occurrence {
@@ -401,7 +405,11 @@ impl DatabaseReader {
             Occurrence::Monthly => now.signed_duration_since(then).num_days() / 31,
         };
 
-        Ok(offset)
+        if offset < 0 {
+            return Err(anyhow!("the calculated checkpoint offset is below zero"))
+        }
+
+        Ok(offset as u32)
     }
 }
 
