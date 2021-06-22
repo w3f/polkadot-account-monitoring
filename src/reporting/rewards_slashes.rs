@@ -3,13 +3,16 @@ use crate::chain_api::RewardSlash;
 use crate::database::{ContextData, DatabaseReader};
 use crate::publishing::GoogleStoragePayload;
 use crate::publishing::Publisher;
-use crate::{BlockNumber, Context, Result, Timestamp};
+use crate::{BlockNumber, Context, Network, Result, Timestamp};
 use std::collections::HashMap;
 use std::marker::PhantomData;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
-pub struct RewardSlashReport(String);
+pub enum RewardSlashReport {
+    All(String),
+    Summary(String),
+}
 
 pub struct RewardSlashReportGenerator<'a> {
     reader: DatabaseReader,
@@ -65,13 +68,6 @@ where
         Ok(Some(data))
     }
     async fn generate(&self, data: &Self::Data) -> Result<Vec<Self::Report>> {
-        #[derive(Debug, Clone, Deserialize)]
-        struct Params {
-            #[serde(rename = "type")]
-            ty: String,
-            value: String,
-        }
-
         if data.is_empty() {
             return Ok(vec![]);
         }
@@ -83,9 +79,8 @@ where
         );
 
         let contexts = self.contexts.read().await;
-
-        let mut raw_report =
-            String::from("Network,Block Number,Address,Description,Event,Value\n");
+        let mut raw_all = String::from("Network,Block Number,Address,Description,Event,Value\n");
+        let mut summary: HashMap<Context, (f64, f64)> = HashMap::new();
 
         for entry in data {
             // TODO: Improve performance here.
@@ -95,28 +90,58 @@ where
                 .ok_or(anyhow!("No context found while generating reports"))?;
 
             let data = entry.data.as_ref();
-            raw_report.push_str(&format!(
+            let amount = data.amount.parse::<f64>()?;
+            let amount = match context.network {
+                Network::Kusama => amount / 1_000_000_000_000.0,
+                Network::Polkadot => amount / 10_000_000_000.0,
+            };
+
+            raw_all.push_str(&format!(
                 "{},{},{},{},{},{}\n",
                 context.network.as_str(),
                 data.block_num,
                 context.stash,
                 context.description,
                 data.event_id,
-                {
-                    let params: Vec<Params> = serde_json::from_str(&data.params)?;
-                    let param =
-                        params
-                            .iter()
-                            .find(|param| param.ty == "Balance")
-                            .ok_or(anyhow!(
-                                "balance not found when generating reports for rewards/slashes"
-                            ))?;
-                    param.value.to_owned()
-                }
+                data.amount,
+            ));
+
+            let event_id = match data.event_id.as_str() {
+                "Reward" => true,
+                "Slash" => false,
+                _ => return Err(anyhow!("Received unknown event id")),
+            };
+
+            summary
+                .entry(context.clone())
+                .and_modify(|(r, s)| match event_id {
+                    true => *r += amount,
+                    false => *s += amount,
+                })
+                .or_insert({
+                    match event_id {
+                        true => (amount, 0.0),
+                        false => (0.0, amount),
+                    }
+                });
+        }
+
+        let mut raw_summary = String::from("Network,Address,Description,Reward,Slash\n");
+        for (context, (reward, slash)) in summary {
+            raw_summary.push_str(&format!(
+                "{},{},{},{},{}\n",
+                context.network.as_str(),
+                context.stash,
+                context.description,
+                reward,
+                slash,
             ));
         }
 
-        Ok(vec![RewardSlashReport(raw_report)])
+        Ok(vec![
+            RewardSlashReport::All(raw_all),
+            RewardSlashReport::Summary(raw_summary),
+        ])
     }
     async fn publish(
         &self,
@@ -138,11 +163,19 @@ impl From<RewardSlashReport> for GoogleStoragePayload {
     fn from(val: RewardSlashReport) -> Self {
         let date = chrono::offset::Utc::now().to_rfc3339();
 
-        GoogleStoragePayload {
-            name: format!("rewards_slashes_all_{}.csv", date),
-            mime_type: "application/vnd.google-apps.document".to_string(),
-            body: val.0.into_bytes(),
-            is_public: false,
+        match val {
+            RewardSlashReport::All(content) => GoogleStoragePayload {
+                name: format!("rewards_slashes_all_{}.csv", date),
+                mime_type: "application/vnd.google-apps.document".to_string(),
+                body: content.into_bytes(),
+                is_public: false,
+            },
+            RewardSlashReport::Summary(content) => GoogleStoragePayload {
+                name: format!("rewards_slashes_summary_{}.csv", date),
+                mime_type: "application/vnd.google-apps.document".to_string(),
+                body: content.into_bytes(),
+                is_public: false,
+            },
         }
     }
 }

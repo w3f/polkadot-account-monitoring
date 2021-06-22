@@ -1,7 +1,7 @@
 use crate::chain_api::{ChainApi, NominationsPage, Response, RewardsSlashesPage, TransfersPage};
 use crate::database::{Database, DatabaseReader};
 use crate::publishing::Publisher;
-use crate::reporting::{GenerateReport, TransferReportGenerator, TransferReport};
+use crate::reporting::{GenerateReport, TransferReport, TransferReportGenerator};
 use crate::{Context, Result};
 
 use std::collections::HashSet;

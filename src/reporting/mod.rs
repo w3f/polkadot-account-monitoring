@@ -5,7 +5,7 @@ use std::sync::Arc;
 mod rewards_slashes;
 mod transfers;
 
-pub use transfers::{TransferReportGenerator, TransferReport};
+pub use transfers::{TransferReport, TransferReportGenerator};
 
 // TODO: Is this type constraint required here?
 #[async_trait]
