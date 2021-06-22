@@ -105,7 +105,7 @@ where
             Ok(None)
         }
     }
-    async fn generate(&self, data: &Self::Data) -> Result<Vec<Self::Report>> {
+    async fn generate(&self, offset: &Offset, data: &Self::Data) -> Result<Vec<Self::Report>> {
         if data.is_empty() {
             return Ok(vec![]);
         }

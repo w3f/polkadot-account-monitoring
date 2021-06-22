@@ -349,7 +349,7 @@ impl ReportGenerator {
             loop {
                 for offset in generator.qualifies().await? {
                     if let Some(data) = generator.fetch_data(&offset).await? {
-                        for report in generator.generate(&data).await? {
+                        for report in generator.generate(&offset, &data).await? {
                             debug!("New report generated, uploading...");
                             generator
                                 .publish(Arc::clone(&publisher), info.clone(), report)

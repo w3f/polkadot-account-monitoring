@@ -42,7 +42,7 @@ pub trait GenerateReport<T: Publisher> {
     fn name() -> &'static str;
     async fn qualifies(&self) -> Result<Vec<Offset>>;
     async fn fetch_data(&self, offset: &Offset) -> Result<Option<Self::Data>>;
-    async fn generate(&self, data: &Self::Data) -> Result<Vec<Self::Report>>;
+    async fn generate(&self, offset: &Offset, data: &Self::Data) -> Result<Vec<Self::Report>>;
     async fn publish(
         &self,
         publisher: Arc<T>,
