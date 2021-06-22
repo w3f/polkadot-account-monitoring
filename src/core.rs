@@ -301,10 +301,8 @@ impl ReportGenerator {
     {
         match module {
             ReportModule::Transfers => {
-                let generator = TransferReportGenerator::new(
-                    self.db.clone(),
-                    Arc::clone(&self.contexts),
-                );
+                let generator =
+                    TransferReportGenerator::new(self.db.clone(), Arc::clone(&self.contexts));
 
                 self.do_run(generator, publisher, info).await;
             }

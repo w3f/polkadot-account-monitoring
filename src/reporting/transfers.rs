@@ -51,7 +51,11 @@ where
         let data = self
             .reader
             // Simply fetch everything as of now.
-            .fetch_transfers(contexts.as_slice(), Timestamp::from(0), Timestamp::from(u64::MAX))
+            .fetch_transfers(
+                contexts.as_slice(),
+                Timestamp::from(0),
+                Timestamp::from(u64::MAX),
+            )
             .await?;
 
         if data.is_empty() {
