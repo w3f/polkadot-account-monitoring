@@ -165,15 +165,17 @@ impl From<TransferReportRaw> for GoogleStoragePayload {
     fn from(val: TransferReportRaw) -> Self {
         use TransferReportRaw::*;
 
+        let date = chrono::offset::Utc::now().to_rfc3339();
+
         match val {
             All(content) => GoogleStoragePayload {
-                name: "report_transfer_all.csv".to_string(),
+                name: format!("report_transfer_all_{}.csv", date),
                 mime_type: "application/vnd.google-apps.document".to_string(),
                 body: content.into_bytes(),
                 is_public: false,
             },
             Summary(content) => GoogleStoragePayload {
-                name: "report_transfer_summary.csv".to_string(),
+                name: format!("report_transfer_summary_{}.csv", date),
                 mime_type: "application/vnd.google-apps.document".to_string(),
                 body: content.into_bytes(),
                 is_public: false,
