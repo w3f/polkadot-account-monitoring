@@ -1,7 +1,7 @@
 use crate::chain_api::{ChainApi, NominationsPage, Response, RewardsSlashesPage, TransfersPage};
 use crate::database::{Database, DatabaseReader};
 use crate::publishing::Publisher;
-use crate::reporting::{GenerateReport, TransferReportGenerator, TransferReportRaw};
+use crate::reporting::{GenerateReport, Occurrence, TransferReportGenerator, TransferReportRaw};
 use crate::{Context, Result};
 
 use std::collections::HashSet;
@@ -284,7 +284,7 @@ pub enum ReportModuleId {
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub struct ReportTransferConfig {
-    pub report_range: u64,
+    pub occurrences: Vec<Occurrence>,
 }
 
 pub struct ReportGenerator {
@@ -316,8 +316,12 @@ impl ReportGenerator {
         let id = module.id();
         match module {
             ReportModule::Transfers(config) => {
-                let generator =
-                    TransferReportGenerator::new(self.db.clone(), Arc::clone(&self.contexts), id);
+                let generator = TransferReportGenerator::new(
+                    self.db.clone(),
+                    Arc::clone(&self.contexts),
+                    id,
+                    config.occurrences,
+                );
 
                 self.do_run(generator, publisher, info).await;
             }
@@ -343,7 +347,7 @@ impl ReportGenerator {
         {
             let mut first_run = true;
             loop {
-                if let Some(offset) = generator.qualifies().await? {
+                for offset in generator.qualifies().await? {
                     if let Some(data) = generator.fetch_data(&offset).await? {
                         for report in generator.generate(&data).await? {
                             debug!("New report generated, uploading...");

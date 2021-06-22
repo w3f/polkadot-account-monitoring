@@ -18,7 +18,19 @@ pub enum Occurrence {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
-pub struct Offset(u32);
+pub struct Offset {
+    offset: u32,
+    occurrence: Occurrence,
+}
+
+impl Offset {
+    pub fn new(offset: u32, occurrence: Occurrence) -> Self {
+        Offset {
+            offset: offset,
+            occurrence: occurrence,
+        }
+    }
+}
 
 // TODO: Is this type constraint required here?
 #[async_trait]
@@ -28,7 +40,7 @@ pub trait GenerateReport<T: Publisher> {
     type Config;
 
     fn name() -> &'static str;
-    async fn qualifies(&self) -> Result<Option<Offset>>;
+    async fn qualifies(&self) -> Result<Vec<Offset>>;
     async fn fetch_data(&self, offset: &Offset) -> Result<Option<Self::Data>>;
     async fn generate(&self, data: &Self::Data) -> Result<Vec<Self::Report>>;
     async fn publish(

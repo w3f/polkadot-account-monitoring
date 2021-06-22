@@ -1,4 +1,4 @@
-use super::{GenerateReport, Offset};
+use super::{GenerateReport, Occurrence, Offset};
 use crate::chain_api::Transfer;
 use crate::core::{ReportModuleId, ReportTransferConfig};
 use crate::database::{ContextData, DatabaseReader};
@@ -20,6 +20,7 @@ pub struct TransferReportGenerator<'a> {
     reader: DatabaseReader,
     contexts: Arc<RwLock<Vec<Context>>>,
     module_id: ReportModuleId,
+    occurrences: Vec<Occurrence>,
     _p: PhantomData<&'a ()>,
 }
 
@@ -28,11 +29,13 @@ impl<'a> TransferReportGenerator<'a> {
         db: DatabaseReader,
         contexts: Arc<RwLock<Vec<Context>>>,
         module_id: ReportModuleId,
+        occurrences: Vec<Occurrence>,
     ) -> Self {
         TransferReportGenerator {
             reader: db,
             contexts: contexts,
             module_id: module_id,
+            occurrences: occurrences,
             _p: PhantomData,
         }
     }
@@ -52,8 +55,19 @@ where
     fn name() -> &'static str {
         "TransferReportGenerator"
     }
-    async fn qualifies(&self) -> Result<Option<Offset>> {
-        unimplemented!()
+    async fn qualifies(&self) -> Result<Vec<Offset>> {
+        let mut offsets = vec![];
+        for occurrence in &self.occurrences {
+            let offset = self
+                .reader
+                .fetch_checkpoint_offset(&self.module_id, &occurrence)
+                .await?;
+            if offset > 0 {
+                offsets.push(Offset::new(offset, *occurrence));
+            }
+        }
+
+        Ok(offsets)
     }
     async fn fetch_data(&self, offset: &Offset) -> Result<Option<Self::Data>> {
         let now = Timestamp::now();

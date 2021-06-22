@@ -346,8 +346,8 @@ impl DatabaseReader {
     }
     pub async fn fetch_checkpoint_offset(
         &self,
-        module_id: ReportModuleId,
-        occurrence: Occurrence,
+        module_id: &ReportModuleId,
+        occurrence: &Occurrence,
     ) -> Result<u32> {
         let coll = self.db.collection::<Checkpoints>(COLL_CHECKPOINTS);
 
