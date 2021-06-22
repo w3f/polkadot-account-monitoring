@@ -17,18 +17,14 @@ pub enum TransferReportRaw {
 }
 
 pub struct TransferReportGenerator<'a> {
-    report_range: u64,
-    last_report: Option<Timestamp>,
     reader: DatabaseReader,
     contexts: Arc<RwLock<Vec<Context>>>,
     _p: PhantomData<&'a ()>,
 }
 
 impl<'a> TransferReportGenerator<'a> {
-    pub fn new(db: DatabaseReader, contexts: Arc<RwLock<Vec<Context>>>, report_range: u64) -> Self {
+    pub fn new(db: DatabaseReader, contexts: Arc<RwLock<Vec<Context>>>) -> Self {
         TransferReportGenerator {
-            report_range: report_range,
-            last_report: None,
             reader: db,
             contexts: contexts,
             _p: PhantomData,
@@ -50,36 +46,25 @@ where
     fn name() -> &'static str {
         "TransferReportGenerator"
     }
-    fn new(db: DatabaseReader, contexts: Arc<RwLock<Vec<Context>>>, config: Self::Config) -> Self {
-        Self::new(db, contexts, config.report_range)
-    }
     async fn fetch_data(&self) -> Result<Option<Self::Data>> {
-        let now = Timestamp::now();
-        let last_report = self.last_report.unwrap_or(Timestamp::from(0));
+        let contexts = self.contexts.read().await;
+        let data = self
+            .reader
+            // Simply fetch everything as of now.
+            .fetch_transfers(contexts.as_slice(), Timestamp::from(0), Timestamp::from(u64::MAX))
+            .await?;
 
-        if last_report < (now - Timestamp::from(self.report_range)) {
-            let contexts = self.contexts.read().await;
-            let data = self
-                .reader
-                .fetch_transfers(contexts.as_slice(), last_report, now)
-                .await?;
-
-            if data.is_empty() {
-                return Ok(None);
-            } else {
-                debug!(
-                    "{}: Fetched {} entries from database",
-                    <Self as GenerateReport<T>>::name(),
-                    data.len()
-                );
-            }
-
-            // TODO: Update `last_report`
-
-            Ok(Some(data))
+        if data.is_empty() {
+            return Ok(None);
         } else {
-            Ok(None)
+            debug!(
+                "{}: Fetched {} entries from database",
+                <Self as GenerateReport<T>>::name(),
+                data.len()
+            );
         }
+
+        Ok(Some(data))
     }
     async fn generate(&self, data: &Self::Data) -> Result<Vec<Self::Report>> {
         if data.is_empty() {
