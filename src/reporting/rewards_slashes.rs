@@ -11,15 +11,15 @@ use tokio::sync::RwLock;
 
 pub struct RewardSlashReport(String);
 
-pub struct RewardSlashGenerator<'a> {
+pub struct RewardSlashReportGenerator<'a> {
     reader: DatabaseReader,
     contexts: Arc<RwLock<Vec<Context>>>,
     _p: PhantomData<&'a ()>,
 }
 
-impl<'a> RewardSlashGenerator<'a> {
+impl<'a> RewardSlashReportGenerator<'a> {
     pub fn new(db: DatabaseReader, contexts: Arc<RwLock<Vec<Context>>>) -> Self {
-        RewardSlashGenerator {
+        RewardSlashReportGenerator {
             reader: db,
             contexts: contexts,
             _p: PhantomData,
@@ -28,7 +28,7 @@ impl<'a> RewardSlashGenerator<'a> {
 }
 
 #[async_trait]
-impl<'a, T> GenerateReport<T> for RewardSlashGenerator<'a>
+impl<'a, T> GenerateReport<T> for RewardSlashReportGenerator<'a>
 where
     T: 'static + Send + Sync + Publisher,
     <T as Publisher>::Data: Send + Sync + From<RewardSlashReport>,
@@ -38,7 +38,7 @@ where
     type Report = RewardSlashReport;
 
     fn name() -> &'static str {
-        "RewardSlashGenerator"
+        "RewardSlashReportGenerator"
     }
     async fn fetch_data(&self) -> Result<Option<Self::Data>> {
         let contexts = self.contexts.read().await;
