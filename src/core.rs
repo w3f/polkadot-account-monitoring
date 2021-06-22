@@ -267,6 +267,14 @@ pub enum ReportModule {
     Transfers(ReportTransferConfig),
 }
 
+impl ReportModule {
+    pub fn id(&self) -> ReportModuleId {
+        match self {
+            ReportModule::Transfers(_) => ReportModuleId::Transfers,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, Hash, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ReportModuleId {
@@ -337,17 +345,19 @@ impl ReportGenerator {
         {
             let mut first_run = true;
             loop {
-                if let Some(data) = generator.fetch_data().await? {
-                    for report in generator.generate(&data).await? {
-                        debug!("New report generated, uploading...");
-                        generator
-                            .publish(Arc::clone(&publisher), info.clone(), report)
-                            .await?;
-                    }
-                } else {
-                    if first_run {
-                        warn!("No data found to generate report");
-                        first_run = false;
+                if let Some(offset) = generator.qualifies().await? {
+                    if let Some(data) = generator.fetch_data(&offset).await? {
+                        for report in generator.generate(&data).await? {
+                            debug!("New report generated, uploading...");
+                            generator
+                                .publish(Arc::clone(&publisher), info.clone(), report)
+                                .await?;
+                        }
+                    } else {
+                        if first_run {
+                            warn!("No data found to generate report");
+                            first_run = false;
+                        }
                     }
                 }
 

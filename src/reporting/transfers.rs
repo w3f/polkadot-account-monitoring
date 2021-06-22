@@ -1,6 +1,6 @@
-use super::GenerateReport;
+use super::{GenerateReport, Offset};
 use crate::chain_api::Transfer;
-use crate::core::ReportTransferConfig;
+use crate::core::{ReportModuleId, ReportTransferConfig};
 use crate::database::{ContextData, DatabaseReader};
 use crate::publishing::GoogleStoragePayload;
 use crate::publishing::Publisher;
@@ -53,7 +53,10 @@ where
     fn new(db: DatabaseReader, contexts: Arc<RwLock<Vec<Context>>>, config: Self::Config) -> Self {
         Self::new(db, contexts, config.report_range)
     }
-    async fn fetch_data(&self) -> Result<Option<Self::Data>> {
+    async fn qualifies(&self) -> Result<Option<Offset>> {
+        unimplemented!()
+    }
+    async fn fetch_data(&self, offset: &Offset) -> Result<Option<Self::Data>> {
         let now = Timestamp::now();
         let last_report = self.last_report.unwrap_or(Timestamp::from(0));
 

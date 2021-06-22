@@ -369,17 +369,17 @@ impl DatabaseReader {
             if let Some(index) = checkpoints.indexes.get(&module_id) {
                 let offset = match occurrence {
                     Occurrence::Daily => {
-                        let (y,m,d) = index.daily;
+                        let (y, m, d) = index.daily;
                         let then = Utc.ymd(y as i32, m, d);
                         now.signed_duration_since(then).num_days()
                     }
                     Occurrence::Weekly => {
-                        let (y,m,d) = index.weekly;
+                        let (y, m, d) = index.weekly;
                         let then = Utc.ymd(y as i32, m, d);
                         now.signed_duration_since(then).num_weeks()
                     }
                     Occurrence::Monthly => {
-                        let (y,m,d) = index.monthly;
+                        let (y, m, d) = index.monthly;
                         let then = Utc.ymd(y as i32, m, d);
                         // One month is always 31 days, even if there's some overlap.
                         now.signed_duration_since(then).num_days() / 31
@@ -387,7 +387,7 @@ impl DatabaseReader {
                 };
 
                 if offset < 0 {
-                    return Err(anyhow!("the calculated checkpoint offset is below zero"))
+                    return Err(anyhow!("the calculated checkpoint offset is below zero"));
                 }
 
                 return Ok(offset as u32);
@@ -406,7 +406,7 @@ impl DatabaseReader {
         };
 
         if offset < 0 {
-            return Err(anyhow!("the calculated checkpoint offset is below zero"))
+            return Err(anyhow!("the calculated checkpoint offset is below zero"));
         }
 
         Ok(offset as u32)
