@@ -58,13 +58,6 @@ impl Timestamp {
 
         Timestamp(time)
     }
-    pub fn as_secs(&self) -> u64 {
-        self.0
-    }
-    pub fn to_date_time(&self) -> DateTime<Utc> {
-        let now = Self::now();
-        Utc.timestamp(now.0 as i64, 0)
-    }
 }
 
 impl Sub for Timestamp {

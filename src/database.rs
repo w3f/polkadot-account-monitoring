@@ -360,36 +360,45 @@ impl DatabaseReader {
             )
             .await?;
 
-        let now = Timestamp::now().to_date_time();
+        let now = chrono::offset::Utc::today() - chrono::Duration::days(1);
         if let Some(checkpoints) = checkpoints {
             if let Some(index) = checkpoints.indexes.get(&module_id) {
                 let offset = match occurrence {
                     Occurrence::Daily => {
-                        let then = DateTime::parse_from_rfc2822(&index.daily)?;
-                        now.day() - then.day()
+                        let (y,m,d) = index.daily;
+                        let then = Utc.ymd(y as i32, m, d);
+                        now.signed_duration_since(then).num_days()
                     }
                     Occurrence::Weekly => {
-                        let then = DateTime::parse_from_rfc2822(&index.weekly)?;
-                        (now.day() - then.day()) / 7
+                        let (y,m,d) = index.weekly;
+                        let then = Utc.ymd(y as i32, m, d);
+                        now.signed_duration_since(then).num_weeks()
                     }
                     Occurrence::Monthly => {
-                        let then = DateTime::parse_from_rfc2822(&index.monthly)?;
-                        now.month() - then.month()
+                        let (y,m,d) = index.monthly;
+                        let then = Utc.ymd(y as i32, m, d);
+                        // One month is always 31 days, even if there's some overlap.
+                        now.signed_duration_since(then).num_days() / 31
                     }
                 };
 
-                return Ok(offset);
+                if offset < 0 {
+                    return Err(anyhow!("the calculated checkpoint offset is below zero"))
+                }
+
+                return Ok(offset as u32);
             }
         } else {
             coll.insert_one(Checkpoints::default(), None).await?;
         }
 
         // If no checkpoint was found, start from the very start.
-        let then = Utc.ymd(1971, 0, 0).and_hms(0, 0, 0);
+        let then = Utc.ymd(1971, 0, 0);
         let offset = match occurrence {
-            Occurrence::Daily => now.day() - then.day(),
-            Occurrence::Weekly => (now.day() - then.day()) / 7,
-            Occurrence::Monthly => now.month() - then.month(),
+            Occurrence::Daily => now.signed_duration_since(then).num_days(),
+            Occurrence::Weekly => now.signed_duration_since(then).num_weeks(),
+            // One month is always 31 days, even if there's some overlap.
+            Occurrence::Monthly => now.signed_duration_since(then).num_days() / 31,
         };
 
         Ok(offset)
@@ -414,9 +423,9 @@ impl Default for Checkpoints {
 
 #[derive(Default, Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
 struct OccurrenceIndex {
-    daily: String,
-    weekly: String,
-    monthly: String,
+    daily: (u32, u32, u32),
+    weekly: (u32, u32, u32),
+    monthly: (u32, u32, u32),
 }
 
 #[cfg(test)]
