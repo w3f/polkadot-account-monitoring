@@ -180,6 +180,7 @@ pub async fn run() -> Result<()> {
         info!("Adding {} accounts to monitor", account_count)
     }
 
+    let mut no_collection = false;
     if let Some(coll_config) = config.collection {
         info!("Setting up scraping service");
         let mut service = ScrapingService::new(db);
@@ -190,6 +191,7 @@ pub async fn run() -> Result<()> {
             service.run(module).await?;
         }
     } else {
+        no_collection = true;
         info!("No scraping modules are enabled");
     }
 
@@ -224,7 +226,11 @@ pub async fn run() -> Result<()> {
     }
 
     info!("Setup completed");
-    wait_blocking().await;
+    if no_collection {
+        sleep(Duration::from_secs(60 * 5)).await;
+    } else {
+        wait_blocking().await;
+    }
 
     Ok(())
 }
