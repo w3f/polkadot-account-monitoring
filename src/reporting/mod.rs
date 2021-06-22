@@ -7,7 +7,7 @@ use tokio::sync::RwLock;
 
 mod transfers;
 
-pub use transfers::{TransferReportGenerator, TransferReportRaw};
+pub use transfers::{TransferReport, TransferReportGenerator};
 
 #[derive(Debug, Clone, Copy, Hash, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]

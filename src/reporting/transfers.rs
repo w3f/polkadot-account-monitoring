@@ -11,9 +11,15 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 
 #[derive(Debug, Clone)]
-pub enum TransferReportRaw {
-    All(String),
-    Summary(String),
+pub enum TransferReport {
+    All(TransferReportEntry),
+    Summary(TransferReportEntry),
+}
+
+#[derive(Debug, Clone)]
+pub struct TransferReportEntry {
+    name: String,
+    raw: String,
 }
 
 pub struct TransferReportGenerator<'a> {
@@ -45,11 +51,11 @@ impl<'a> TransferReportGenerator<'a> {
 impl<'a, T> GenerateReport<T> for TransferReportGenerator<'a>
 where
     T: 'static + Send + Sync + Publisher,
-    <T as Publisher>::Data: Send + Sync + From<TransferReportRaw>,
+    <T as Publisher>::Data: Send + Sync + From<TransferReport>,
     <T as Publisher>::Info: Send + Sync,
 {
     type Data = Vec<ContextData<'a, Transfer>>;
-    type Report = TransferReportRaw;
+    type Report = TransferReport;
     type Config = ReportTransferConfig;
 
     fn name() -> &'static str {
@@ -159,8 +165,14 @@ where
         }
 
         Ok(vec![
-            TransferReportRaw::All(raw_all),
-            TransferReportRaw::Summary(raw_summary),
+            TransferReport::All(TransferReportEntry {
+                name: "".to_string(),
+                raw: raw_all,
+            }),
+            TransferReport::Summary(TransferReportEntry {
+                name: "".to_string(),
+                raw: raw_summary,
+            }),
         ])
     }
     async fn publish(
@@ -182,21 +194,21 @@ where
     }
 }
 
-impl From<TransferReportRaw> for GoogleStoragePayload {
-    fn from(val: TransferReportRaw) -> Self {
-        use TransferReportRaw::*;
+impl From<TransferReport> for GoogleStoragePayload {
+    fn from(val: TransferReport) -> Self {
+        use TransferReport::*;
 
         match val {
-            All(content) => GoogleStoragePayload {
-                name: "report_transfer_all.csv".to_string(),
+            All(entry) => GoogleStoragePayload {
+                name: format!("report_transfer_all_{}.csv", entry.name),
                 mime_type: "application/vnd.google-apps.document".to_string(),
-                body: content.into_bytes(),
+                body: entry.raw.into_bytes(),
                 is_public: false,
             },
-            Summary(content) => GoogleStoragePayload {
-                name: "report_transfer_summary.csv".to_string(),
+            Summary(entry) => GoogleStoragePayload {
+                name: format!("report_transfer_summary_{}.csv", entry.name),
                 mime_type: "application/vnd.google-apps.document".to_string(),
-                body: content.into_bytes(),
+                body: entry.raw.into_bytes(),
                 is_public: false,
             },
         }
