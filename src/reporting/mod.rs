@@ -49,4 +49,5 @@ pub trait GenerateReport<T: Publisher> {
         info: <T as Publisher>::Info,
         report: Self::Report,
     ) -> Result<()>;
+    async fn track_offset(&self, offset: Offset) -> Result<()>;
 }

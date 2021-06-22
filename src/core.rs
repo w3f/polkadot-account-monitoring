@@ -354,6 +354,8 @@ impl ReportGenerator {
                             generator
                                 .publish(Arc::clone(&publisher), info.clone(), report)
                                 .await?;
+
+                            generator.track_offset(offset).await?;
                         }
                     } else {
                         if first_run {

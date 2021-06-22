@@ -177,6 +177,9 @@ where
 
         Ok(())
     }
+    async fn track_offset(&self, offset: Offset) -> Result<()> {
+        unimplemented!()
+    }
 }
 
 impl From<TransferReportRaw> for GoogleStoragePayload {
