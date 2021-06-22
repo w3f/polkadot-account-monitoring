@@ -28,7 +28,6 @@ pub trait GenerateReport<T: Publisher> {
     type Config;
 
     fn name() -> &'static str;
-    fn new(db: DatabaseReader, contexts: Arc<RwLock<Vec<Context>>>, config: Self::Config) -> Self;
     async fn qualifies(&self) -> Result<Option<Offset>>;
     async fn fetch_data(&self, offset: &Offset) -> Result<Option<Self::Data>>;
     async fn generate(&self, data: &Self::Data) -> Result<Vec<Self::Report>>;

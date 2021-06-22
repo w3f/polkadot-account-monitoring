@@ -313,13 +313,11 @@ impl ReportGenerator {
         <P as Publisher>::Data: Send + Sync + From<TransferReportRaw>,
         <P as Publisher>::Info: Send + Sync + Clone,
     {
+        let id = module.id();
         match module {
             ReportModule::Transfers(config) => {
-                let generator = TransferReportGenerator::new(
-                    self.db.clone(),
-                    Arc::clone(&self.contexts),
-                    config.report_range,
-                );
+                let generator =
+                    TransferReportGenerator::new(self.db.clone(), Arc::clone(&self.contexts), id);
 
                 self.do_run(generator, publisher, info).await;
             }

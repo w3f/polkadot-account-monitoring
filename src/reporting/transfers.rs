@@ -17,20 +17,22 @@ pub enum TransferReportRaw {
 }
 
 pub struct TransferReportGenerator<'a> {
-    report_range: u64,
-    last_report: Option<Timestamp>,
     reader: DatabaseReader,
     contexts: Arc<RwLock<Vec<Context>>>,
+    module_id: ReportModuleId,
     _p: PhantomData<&'a ()>,
 }
 
 impl<'a> TransferReportGenerator<'a> {
-    pub fn new(db: DatabaseReader, contexts: Arc<RwLock<Vec<Context>>>, report_range: u64) -> Self {
+    pub fn new(
+        db: DatabaseReader,
+        contexts: Arc<RwLock<Vec<Context>>>,
+        module_id: ReportModuleId,
+    ) -> Self {
         TransferReportGenerator {
-            report_range: report_range,
-            last_report: None,
             reader: db,
             contexts: contexts,
+            module_id: module_id,
             _p: PhantomData,
         }
     }
@@ -50,17 +52,16 @@ where
     fn name() -> &'static str {
         "TransferReportGenerator"
     }
-    fn new(db: DatabaseReader, contexts: Arc<RwLock<Vec<Context>>>, config: Self::Config) -> Self {
-        Self::new(db, contexts, config.report_range)
-    }
     async fn qualifies(&self) -> Result<Option<Offset>> {
         unimplemented!()
     }
     async fn fetch_data(&self, offset: &Offset) -> Result<Option<Self::Data>> {
         let now = Timestamp::now();
-        let last_report = self.last_report.unwrap_or(Timestamp::from(0));
+        // TODO: Delete this
+        let last_report = Timestamp::now();
 
-        if last_report < (now - Timestamp::from(self.report_range)) {
+        // TODO: Delete this
+        if last_report < (now - Timestamp::from(0)) {
             let contexts = self.contexts.read().await;
             let data = self
                 .reader
