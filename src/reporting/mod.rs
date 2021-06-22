@@ -3,6 +3,7 @@ use crate::Result;
 use std::sync::Arc;
 
 mod transfers;
+mod rewards_slashes;
 
 pub use transfers::{TransferReportGenerator, TransferReportRaw};
 
@@ -11,7 +12,6 @@ pub use transfers::{TransferReportGenerator, TransferReportRaw};
 pub trait GenerateReport<T: Publisher> {
     type Data;
     type Report;
-    type Config;
 
     fn name() -> &'static str;
     async fn fetch_data(&self) -> Result<Option<Self::Data>>;

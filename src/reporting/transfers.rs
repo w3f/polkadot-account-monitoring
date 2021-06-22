@@ -1,6 +1,5 @@
 use super::GenerateReport;
 use crate::chain_api::Transfer;
-use crate::core::ReportTransferConfig;
 use crate::database::{ContextData, DatabaseReader};
 use crate::publishing::GoogleStoragePayload;
 use crate::publishing::Publisher;
@@ -41,7 +40,6 @@ where
 {
     type Data = Vec<ContextData<'a, Transfer>>;
     type Report = TransferReportRaw;
-    type Config = ReportTransferConfig;
 
     fn name() -> &'static str {
         "TransferReportGenerator"

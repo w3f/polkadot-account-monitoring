@@ -267,12 +267,6 @@ pub enum ReportModule {
     Transfers,
 }
 
-#[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub struct ReportTransferConfig {
-    pub report_range: u64,
-}
-
 pub struct ReportGenerator {
     db: DatabaseReader,
     contexts: Arc<RwLock<Vec<Context>>>,
