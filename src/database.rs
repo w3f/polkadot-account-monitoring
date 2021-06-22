@@ -4,14 +4,14 @@ use crate::chain_api::{
 use crate::{BlockNumber, Context, ContextId, Result, Timestamp};
 use bson::{doc, from_document, to_bson, to_document, Bson, Document};
 use futures::StreamExt;
-use mongodb::options::UpdateOptions;
+use mongodb::options::{FindOptions, UpdateOptions};
 use mongodb::{Client, Database as MongoDb};
 use serde::Serialize;
 use std::borrow::Cow;
 
 const COLL_TRANSFER_RAW: &'static str = "raw_transfers";
 const COLL_REWARD_SLASH_RAW: &'static str = "raw_rewards_slashes";
-const COLL_NOMINATIONS_RAW: &'static str = "raw_rewards_slashes";
+const COLL_NOMINATIONS_RAW: &'static str = "raw_nominations";
 
 /// Convenience trait. Converts a value to BSON.
 trait ToBson {
@@ -308,7 +308,13 @@ impl DatabaseReader {
                     }
                 }
             ]
-        }, None).await?;
+        }, {
+            let mut ops = FindOptions::default();
+            ops.sort = Some(doc! {
+                "data.block_num": -1
+            });
+            Some(ops)
+        }).await?;
 
         let mut rewards_slashes = vec![];
         while let Some(doc) = cursor.next().await {
@@ -327,7 +333,7 @@ impl DatabaseReader {
 
         let mut cursor = coll.find(doc!{
             "context_id": {
-                "$in": contexts.iter().map(|c| c.as_str()).collect::<Vec<&str>>().to_bson()?,
+                "$in": contexts.iter().map(|c| c.id()).collect::<Vec<ContextId>>().to_bson()?,
             },
         }, None).await?;
 

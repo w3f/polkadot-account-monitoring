@@ -67,10 +67,10 @@ impl ChainApi {
             .post(
                 &format!(
                     "https://{}.api.subscan.io/api/scan/transfers",
-                    context.network().as_str()
+                    context.network.as_str()
                 ),
                 &PageBody {
-                    address: context.as_str(),
+                    address: &context.stash,
                     row: row,
                     page: page,
                 },
@@ -87,10 +87,10 @@ impl ChainApi {
             .post(
                 &format!(
                     "https://{}.api.subscan.io/api/scan/account/reward_slash",
-                    context.network().as_str()
+                    context.network.as_str()
                 ),
                 &PageBody {
-                    address: context.as_str(),
+                    address: &context.stash,
                     row: row,
                     page: page,
                 },
@@ -105,10 +105,10 @@ impl ChainApi {
             .post(
                 &format!(
                     "https://{}.api.subscan.io/api/scan/staking/voted",
-                    context.network().as_str()
+                    context.network.as_str()
                 ),
                 &Address {
-                    address: context.as_str(),
+                    address: &context.stash,
                 },
             )
             .await?)

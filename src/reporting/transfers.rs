@@ -10,7 +10,7 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 
 #[derive(Debug, Clone)]
-pub enum TransferReportRaw {
+pub enum TransferReport {
     All(String),
     Summary(String),
 }
@@ -35,11 +35,11 @@ impl<'a> TransferReportGenerator<'a> {
 impl<'a, T> GenerateReport<T> for TransferReportGenerator<'a>
 where
     T: 'static + Send + Sync + Publisher,
-    <T as Publisher>::Data: Send + Sync + From<TransferReportRaw>,
+    <T as Publisher>::Data: Send + Sync + From<TransferReport>,
     <T as Publisher>::Info: Send + Sync,
 {
     type Data = Vec<ContextData<'a, Transfer>>;
-    type Report = TransferReportRaw;
+    type Report = TransferReport;
 
     fn name() -> &'static str {
         "TransferReportGenerator"
@@ -128,8 +128,8 @@ where
         }
 
         Ok(vec![
-            TransferReportRaw::All(raw_all),
-            TransferReportRaw::Summary(raw_summary),
+            TransferReport::All(raw_all),
+            TransferReport::Summary(raw_summary),
         ])
     }
     async fn publish(
@@ -148,9 +148,9 @@ where
     }
 }
 
-impl From<TransferReportRaw> for GoogleStoragePayload {
-    fn from(val: TransferReportRaw) -> Self {
-        use TransferReportRaw::*;
+impl From<TransferReport> for GoogleStoragePayload {
+    fn from(val: TransferReport) -> Self {
+        use TransferReport::*;
 
         let date = chrono::offset::Utc::now().to_rfc3339();
 

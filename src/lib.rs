@@ -125,17 +125,11 @@ pub struct Context {
 }
 
 impl Context {
-    pub fn as_str(&self) -> &str {
-        self.stash.as_str()
-    }
     pub fn id<'a>(&'a self) -> ContextId<'a> {
         ContextId {
             stash: Cow::Borrowed(&self.stash),
             network: self.network,
         }
-    }
-    pub fn network(&self) -> Network {
-        self.network
     }
 }
 

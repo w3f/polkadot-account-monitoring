@@ -1,7 +1,7 @@
 use crate::chain_api::{ChainApi, NominationsPage, Response, RewardsSlashesPage, TransfersPage};
 use crate::database::{Database, DatabaseReader};
 use crate::publishing::Publisher;
-use crate::reporting::{GenerateReport, TransferReportGenerator, TransferReportRaw};
+use crate::reporting::{GenerateReport, TransferReportGenerator, TransferReport};
 use crate::{Context, Result};
 
 use std::collections::HashSet;
@@ -290,7 +290,7 @@ impl ReportGenerator {
         info: <P as Publisher>::Info,
     ) where
         P: 'static + Send + Sync + Publisher,
-        <P as Publisher>::Data: Send + Sync + From<TransferReportRaw>,
+        <P as Publisher>::Data: Send + Sync + From<TransferReport>,
         <P as Publisher>::Info: Send + Sync + Clone,
     {
         match module {
@@ -373,7 +373,7 @@ mod tests {
 
     #[async_trait]
     impl Publisher for StdOut {
-        type Data = TransferReportRaw;
+        type Data = TransferReport;
         type Info = ();
 
         async fn upload_data(&self, _info: Self::Info, data: Self::Data) -> Result<()> {
