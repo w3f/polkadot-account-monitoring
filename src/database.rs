@@ -1,23 +1,23 @@
 use crate::chain_api::{
     Nomination, NominationsPage, Response, RewardSlash, RewardsSlashesPage, Transfer, TransfersPage,
 };
-use crate::{BlockNumber, Context, ContextId, Result, Timestamp};
 use crate::core::ReportModuleId;
 use crate::reporting::Occurrence;
+use crate::{BlockNumber, Context, ContextId, Result, Timestamp};
 use bson::{doc, from_document, to_bson, to_document, Bson, Document};
+use chrono::offset::TimeZone;
+use chrono::{DateTime, Datelike, Timelike, Utc};
 use futures::StreamExt;
 use mongodb::options::UpdateOptions;
 use mongodb::{Client, Database as MongoDb};
 use serde::Serialize;
-use chrono::Utc;
-use chrono::offset::TimeZone;
 use std::borrow::Cow;
-use std::collections::{HashSet, HashMap};
+use std::collections::{HashMap, HashSet};
 
 const COLL_TRANSFER_RAW: &'static str = "raw_transfers";
 const COLL_REWARD_SLASH_RAW: &'static str = "raw_rewards_slashes";
 const COLL_NOMINATIONS_RAW: &'static str = "raw_rewards_slashes";
-const COLL_REPORT_STATE: &'static str = "report_state";
+const COLL_CHECKPOINTS: &'static str = "report_state";
 
 /// Convenience trait. Converts a value to BSON.
 trait ToBson {
@@ -344,40 +344,79 @@ impl DatabaseReader {
 
         Ok(validators)
     }
-    pub async fn log_occurrence(&self, module_id: ReportModuleId, occurrence: Occurrence) -> Result<()> {
-        let coll = self.db.collection::<OccurrenceLog>(COLL_REPORT_STATE);
+    pub async fn fetch_checkpoint_offset(
+        &self,
+        module_id: ReportModuleId,
+        occurrence: Occurrence,
+    ) -> Result<u32> {
+        let coll = self.db.collection::<Checkpoints>(COLL_CHECKPOINTS);
 
-        let log = coll.find_one(doc! {
-            "type": "occurrence_log",
-        }, None).await?;
+        let checkpoints = coll
+            .find_one(
+                doc! {
+                    "type": "checkpoints",
+                },
+                None,
+            )
+            .await?;
 
-        if let Some(mut log) = log {
-            log
-                .indexes
-                .entry(module_id)
-                .and_modify(|index| {
+        let now = Timestamp::now().to_date_time();
+        if let Some(checkpoints) = checkpoints {
+            if let Some(index) = checkpoints.indexes.get(&module_id) {
+                let offset = match occurrence {
+                    Occurrence::Daily => {
+                        let then = DateTime::parse_from_rfc2822(&index.daily)?;
+                        now.day() - then.day()
+                    }
+                    Occurrence::Weekly => {
+                        let then = DateTime::parse_from_rfc2822(&index.weekly)?;
+                        (now.day() - then.day()) / 7
+                    }
+                    Occurrence::Monthly => {
+                        let then = DateTime::parse_from_rfc2822(&index.monthly)?;
+                        now.month() - then.month()
+                    }
+                };
 
-                });
+                return Ok(offset);
+            }
         } else {
-
+            coll.insert_one(Checkpoints::default(), None).await?;
         }
 
-        Ok(())
+        // If no checkpoint was found, start from the very start.
+        let then = Utc.ymd(1971, 0, 0).and_hms(0, 0, 0);
+        let offset = match occurrence {
+            Occurrence::Daily => now.day() - then.day(),
+            Occurrence::Weekly => (now.day() - then.day()) / 7,
+            Occurrence::Monthly => now.month() - then.month(),
+        };
+
+        Ok(offset)
     }
 }
 
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
-struct OccurrenceLog {
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+struct Checkpoints {
     #[serde(rename = "type")]
     ty: String,
     indexes: HashMap<ReportModuleId, OccurrenceIndex>,
 }
 
+impl Default for Checkpoints {
+    fn default() -> Self {
+        Checkpoints {
+            ty: "checkpoints".to_string(),
+            indexes: Default::default(),
+        }
+    }
+}
+
 #[derive(Default, Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
 struct OccurrenceIndex {
-    daily: u64,
-    weekly: u64,
-    monthly: u64,
+    daily: String,
+    weekly: String,
+    monthly: String,
 }
 
 #[cfg(test)]

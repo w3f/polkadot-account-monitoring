@@ -9,6 +9,8 @@ extern crate anyhow;
 
 use self::core::{ReportGenerator, ReportModule, ScrapingModule, ScrapingService};
 use anyhow::Error;
+use chrono::offset::TimeZone;
+use chrono::{DateTime, Utc};
 use database::Database;
 use log::LevelFilter;
 use publishing::{GoogleDrive, GoogleDriveUploadInfo};
@@ -17,8 +19,6 @@ use std::ops::Sub;
 use std::sync::Arc;
 use std::{borrow::Cow, fs::read_to_string};
 use tokio::time::{sleep, Duration};
-use chrono::{Utc, DateTime};
-use chrono::offset::TimeZone;
 
 mod chain_api;
 mod core;
@@ -57,6 +57,9 @@ impl Timestamp {
             .as_secs();
 
         Timestamp(time)
+    }
+    pub fn as_secs(&self) -> u64 {
+        self.0
     }
     pub fn to_date_time(&self) -> DateTime<Utc> {
         let now = Self::now();
