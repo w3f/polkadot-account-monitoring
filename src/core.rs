@@ -347,21 +347,20 @@ impl ReportGenerator {
         {
             let mut first_run = true;
             loop {
-                for offset in generator.qualifies().await? {
-                    if let Some(data) = generator.fetch_data(&offset).await? {
-                        for report in generator.generate(&offset, &data).await? {
-                            debug!("New report generated, uploading...");
-                            generator
-                                .publish(Arc::clone(&publisher), info.clone(), report)
-                                .await?;
+                let batches = generator.time_batches().await?;
+                if let Some(data) = generator.fetch_data(&batches).await? {
+                    for report in generator.generate(&batches, &data).await? {
+                        debug!("New report generated, uploading...");
+                        generator
+                            .publish(Arc::clone(&publisher), info.clone(), report)
+                            .await?;
 
-                            generator.track_offset(offset).await?;
-                        }
-                    } else {
-                        if first_run {
-                            warn!("No data found to generate report");
-                            first_run = false;
-                        }
+                        generator.track_latest(&batches).await?;
+                    }
+                } else {
+                    if first_run {
+                        warn!("No data found to generate report");
+                        first_run = false;
                     }
                 }
 

@@ -1,4 +1,4 @@
-use super::{GenerateReport, Occurrence, Offset};
+use super::{GenerateReport, Occurrence, TimeBatches};
 use crate::chain_api::Transfer;
 use crate::core::{ReportModuleId, ReportTransferConfig};
 use crate::database::{ContextData, DatabaseReader};
@@ -61,7 +61,9 @@ where
     fn name() -> &'static str {
         "TransferReportGenerator"
     }
-    async fn qualifies(&self) -> Result<Vec<Offset>> {
+    async fn time_batches(&self) -> Result<TimeBatches> {
+        unimplemented!()
+        /*
         let mut offsets = vec![];
         for occurrence in &self.occurrences {
             let offset = self
@@ -69,43 +71,42 @@ where
                 .fetch_checkpoint_offset(&self.module_id, &occurrence)
                 .await?;
             if offset > 0 {
-                offsets.push(Offset::new(offset, *occurrence));
+                //offsets.push(TimeBatches::new(offset, *occurrence));
             }
         }
 
         Ok(offsets)
+        */
     }
-    async fn fetch_data(&self, offset: &Offset) -> Result<Option<Self::Data>> {
-        let now = Timestamp::now();
-        // TODO: Delete this
-        let last_report = Timestamp::now();
-
-        // TODO: Delete this
-        if last_report < (now - Timestamp::from(0)) {
-            let contexts = self.contexts.read().await;
-            let data = self
-                .reader
-                .fetch_transfers(contexts.as_slice(), last_report, now)
-                .await?;
-
-            if data.is_empty() {
-                return Ok(None);
+    async fn fetch_data(&self, batches: &TimeBatches) -> Result<Option<Self::Data>> {
+        let contexts = self.contexts.read().await;
+        let (from, to) = {
+            if let Some(min_max) = batches.min_max() {
+                min_max
             } else {
-                debug!(
-                    "{}: Fetched {} entries from database",
-                    <Self as GenerateReport<T>>::name(),
-                    data.len()
-                );
+                return Ok(None)
             }
+        };
+        let data = self
+            .reader
+            .fetch_transfers(contexts.as_slice(), from, to)
+            .await?;
 
-            // TODO: Update `last_report`
-
-            Ok(Some(data))
+        if data.is_empty() {
+            return Ok(None);
         } else {
-            Ok(None)
+            debug!(
+                "{}: Fetched {} entries from database",
+                <Self as GenerateReport<T>>::name(),
+                data.len()
+            );
         }
+
+        // TODO: Update `last_report`
+
+        Ok(Some(data))
     }
-    async fn generate(&self, offset: &Offset, data: &Self::Data) -> Result<Vec<Self::Report>> {
+    async fn generate(&self, offset: &TimeBatches, data: &Self::Data) -> Result<Vec<Self::Report>> {
         if data.is_empty() {
             return Ok(vec![]);
         }
@@ -189,7 +190,7 @@ where
 
         Ok(())
     }
-    async fn track_offset(&self, offset: Offset) -> Result<()> {
+    async fn track_latest(&self, batches: &TimeBatches) -> Result<()> {
         unimplemented!()
     }
 }

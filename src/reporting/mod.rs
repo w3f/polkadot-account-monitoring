@@ -4,6 +4,7 @@ use crate::Context;
 use crate::Result;
 use std::sync::Arc;
 use tokio::sync::RwLock;
+use chrono::{DateTime, Utc};
 
 mod transfers;
 
@@ -17,18 +18,17 @@ pub enum Occurrence {
     Monthly,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
-pub struct Offset {
-    offset: u32,
-    occurrence: Occurrence,
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct TimeBatches {
+    pub batches: Vec<(DateTime<Utc>, DateTime<Utc>)>,
 }
 
-impl Offset {
-    pub fn new(offset: u32, occurrence: Occurrence) -> Self {
-        Offset {
-            offset: offset,
-            occurrence: occurrence,
-        }
+impl TimeBatches {
+    pub fn min_max(&self) -> Option<(DateTime<Utc>, DateTime<Utc>)> {
+        Some((
+            *self.batches.iter().map(|(from, _)| from).min()?,
+            *self.batches.iter().map(|(_, to)| to).max()?,
+        ))
     }
 }
 
@@ -40,14 +40,14 @@ pub trait GenerateReport<T: Publisher> {
     type Config;
 
     fn name() -> &'static str;
-    async fn qualifies(&self) -> Result<Vec<Offset>>;
-    async fn fetch_data(&self, offset: &Offset) -> Result<Option<Self::Data>>;
-    async fn generate(&self, offset: &Offset, data: &Self::Data) -> Result<Vec<Self::Report>>;
+    async fn time_batches(&self) -> Result<TimeBatches>;
+    async fn fetch_data(&self, batches: &TimeBatches) -> Result<Option<Self::Data>>;
+    async fn generate(&self, batches: &TimeBatches, data: &Self::Data) -> Result<Vec<Self::Report>>;
     async fn publish(
         &self,
         publisher: Arc<T>,
         info: <T as Publisher>::Info,
         report: Self::Report,
     ) -> Result<()>;
-    async fn track_offset(&self, offset: Offset) -> Result<()>;
+    async fn track_latest(&self, batches: &TimeBatches) -> Result<()>;
 }

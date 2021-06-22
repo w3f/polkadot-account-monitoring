@@ -2,7 +2,7 @@ use crate::chain_api::{
     Nomination, NominationsPage, Response, RewardSlash, RewardsSlashesPage, Transfer, TransfersPage,
 };
 use crate::core::ReportModuleId;
-use crate::reporting::Occurrence;
+use crate::reporting::{Occurrence, TimeBatches};
 use crate::{BlockNumber, Context, ContextId, Result, Timestamp};
 use bson::{doc, from_document, to_bson, to_document, Bson, Document};
 use chrono::offset::TimeZone;
@@ -247,8 +247,8 @@ impl DatabaseReader {
     pub async fn fetch_transfers<'a>(
         &self,
         contexts: &[Context],
-        from: Timestamp,
-        to: Timestamp,
+        from: DateTime<Utc>,
+        to: DateTime<Utc>,
     ) -> Result<Vec<ContextData<'a, Transfer>>> {
         let coll = self
             .db
@@ -263,12 +263,12 @@ impl DatabaseReader {
                     "$and": [
                         {
                             "data.block_timestamp": {
-                                "$gte": from.to_bson()?
+                                "$gte": from.timestamp().to_bson()?
                             }
                         },
                         {
                             "data.block_timestamp": {
-                                "$lte": to.to_bson()?
+                                "$lte": to.timestamp().to_bson()?
                             }
                         }
                     ]
