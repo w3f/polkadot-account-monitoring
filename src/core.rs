@@ -299,7 +299,8 @@ impl ReportGenerator {
                 self.do_run(generator, publisher, info).await;
             }
             ReportModule::RewardsSlashes => {
-                let generator = RewardSlashReportGenerator::new(self.db.clone(), Arc::clone(&self.contexts));
+                let generator =
+                    RewardSlashReportGenerator::new(self.db.clone(), Arc::clone(&self.contexts));
                 self.do_run(generator, publisher, info).await;
             }
         }

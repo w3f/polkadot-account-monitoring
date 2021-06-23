@@ -1,4 +1,4 @@
-use super::GenerateReport;
+/*  */use super::GenerateReport;
 use crate::chain_api::RewardSlash;
 use crate::database::{ContextData, DatabaseReader};
 use crate::publishing::GoogleStoragePayload;
@@ -51,7 +51,7 @@ where
             .fetch_rewards_slashes(
                 contexts.as_slice(),
                 BlockNumber::from(0),
-                BlockNumber::from(u64::MAX),
+                BlockNumber::from(i64::MAX as u64),
             )
             .await?;
 
@@ -103,7 +103,7 @@ where
                 context.stash,
                 context.description,
                 data.event_id,
-                data.amount,
+                amount,
             ));
 
             let event_id = match data.event_id.as_str() {

@@ -52,7 +52,7 @@ where
             .fetch_transfers(
                 contexts.as_slice(),
                 Timestamp::from(0),
-                Timestamp::from(u64::MAX),
+                Timestamp::from(i64::MAX as u64),
             )
             .await?;
 
