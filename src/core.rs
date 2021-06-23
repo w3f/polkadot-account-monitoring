@@ -1,7 +1,9 @@
 use crate::chain_api::{ChainApi, NominationsPage, Response, RewardsSlashesPage, TransfersPage};
 use crate::database::{Database, DatabaseReader};
-use crate::publishing::Publisher;
-use crate::reporting::{GenerateReport, TransferReport, TransferReportGenerator};
+use crate::publishing::{GoogleDrive, Publisher};
+use crate::reporting::{
+    GenerateReport, RewardSlashReportGenerator, TransferReport, TransferReportGenerator,
+};
 use crate::{Context, Result};
 
 use std::collections::HashSet;
@@ -265,6 +267,7 @@ impl<'a> ScrapingService<'a> {
 #[serde(rename_all = "snake_case")]
 pub enum ReportModule {
     Transfers,
+    RewardsSlashes,
 }
 
 pub struct ReportGenerator {
@@ -283,21 +286,20 @@ impl ReportGenerator {
     pub async fn add_contexts(&mut self, mut contexts: Vec<Context>) {
         self.contexts.write().await.append(&mut contexts);
     }
-    pub async fn run<P>(
+    pub async fn run(
         &mut self,
         module: ReportModule,
-        publisher: Arc<P>,
-        info: <P as Publisher>::Info,
-    ) where
-        P: 'static + Send + Sync + Publisher,
-        <P as Publisher>::Data: Send + Sync + From<TransferReport>,
-        <P as Publisher>::Info: Send + Sync + Clone,
-    {
+        publisher: Arc<GoogleDrive>,
+        info: <GoogleDrive as Publisher>::Info,
+    ) {
         match module {
             ReportModule::Transfers => {
                 let generator =
                     TransferReportGenerator::new(self.db.clone(), Arc::clone(&self.contexts));
-
+                self.do_run(generator, publisher, info).await;
+            }
+            ReportModule::RewardsSlashes => {
+                let generator = RewardSlashReportGenerator::new(self.db.clone(), Arc::clone(&self.contexts));
                 self.do_run(generator, publisher, info).await;
             }
         }

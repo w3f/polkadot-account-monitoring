@@ -5,6 +5,7 @@ use std::sync::Arc;
 mod rewards_slashes;
 mod transfers;
 
+pub use rewards_slashes::RewardSlashReportGenerator;
 pub use transfers::{TransferReport, TransferReportGenerator};
 
 // TODO: Is this type constraint required here?
