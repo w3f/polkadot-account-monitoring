@@ -83,7 +83,7 @@ where
 
         // List all transfers.
         let mut raw_all =
-            String::from("Block Number,Block Timestamp,From,To,Amount,Extrinsic Index,Success\n");
+            String::from("Network,Block Number,Block Timestamp,From,Description,To,Amount,Extrinsic Index,Success\n");
         // Create summary of all accounts.
         let mut summary: HashMap<Context, f64> = HashMap::new();
 
@@ -98,10 +98,12 @@ where
 
             let data = entry.data.to_owned();
             raw_all.push_str(&format!(
-                "{},{},{},{},{},{},{}\n",
+                "{},{},{},{},{},{},{},{},{}\n",
+                context.network.as_str(),
                 data.block_num,
                 data.block_timestamp,
                 data.from,
+                context.description,
                 data.to,
                 data.amount,
                 data.extrinsic_index,
