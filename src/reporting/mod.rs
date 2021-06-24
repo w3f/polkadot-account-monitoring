@@ -2,9 +2,9 @@ use crate::publishing::Publisher;
 use crate::Result;
 use std::sync::Arc;
 
+mod nominations;
 mod rewards_slashes;
 mod transfers;
-mod nominations;
 
 pub use rewards_slashes::RewardSlashReportGenerator;
 pub use transfers::{TransferReport, TransferReportGenerator};

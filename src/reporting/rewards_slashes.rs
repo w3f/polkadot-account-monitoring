@@ -1,4 +1,5 @@
-/*  */use super::GenerateReport;
+/*  */
+use super::GenerateReport;
 use crate::chain_api::RewardSlash;
 use crate::database::{ContextData, DatabaseReader};
 use crate::publishing::GoogleStoragePayload;

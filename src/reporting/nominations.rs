@@ -1,11 +1,11 @@
 use super::GenerateReport;
-use crate::database::{DatabaseReader, ContextData};
-use crate::{Context, Result};
-use crate::publishing::{Publisher, GoogleStoragePayload};
 use crate::chain_api::Nomination;
-use tokio::sync::RwLock;
-use std::sync::Arc;
+use crate::database::{ContextData, DatabaseReader};
+use crate::publishing::{GoogleStoragePayload, Publisher};
+use crate::{Context, Result};
 use std::marker::PhantomData;
+use std::sync::Arc;
+use tokio::sync::RwLock;
 
 pub struct NominationReportGenerator<'a> {
     reader: DatabaseReader,
@@ -33,9 +33,7 @@ where
         let data = self
             .reader
             // Simply fetch everything as of now.
-            .fetch_nominations(
-                contexts.as_slice(),
-            )
+            .fetch_nominations(contexts.as_slice())
             .await?;
 
         if data.is_empty() {
@@ -51,7 +49,7 @@ where
         Ok(Some(data))
     }
     async fn generate(&self, data: &Self::Data) -> Result<Vec<Self::Report>> {
-	unimplemented!()
+        unimplemented!()
     }
     async fn publish(
         &self,
@@ -59,12 +57,18 @@ where
         info: <T as Publisher>::Info,
         report: Self::Report,
     ) -> Result<()> {
-	unimplemented!()
+        publisher
+            .upload_data(info, <T as Publisher>::Data::from(report))
+            .await?;
+
+        info!("Uploaded new report");
+
+        Ok(())
     }
 }
 
 impl From<NominationReport> for GoogleStoragePayload {
     fn from(val: NominationReport) -> Self {
-	unimplemented!()
+        unimplemented!()
     }
 }
