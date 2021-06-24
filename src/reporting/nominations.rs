@@ -49,7 +49,39 @@ where
         Ok(Some(data))
     }
     async fn generate(&self, data: &Self::Data) -> Result<Vec<Self::Report>> {
-        unimplemented!()
+        if data.is_empty() {
+            return Ok(vec![]);
+        }
+
+        debug!(
+            "{}: Generating reports of {} database entries",
+            <Self as GenerateReport<T>>::name(),
+            data.len()
+        );
+
+        let contexts = self.contexts.read().await;
+
+        let mut report = String::from("Network,Address,Description,Validator,Display Name\n");
+
+        for entry in data {
+            // TODO: Improve performance here.
+            let context = contexts
+                .iter()
+                .find(|c| c.stash == entry.context_id.stash.clone().into_owned())
+                .ok_or(anyhow!("No context found while generating reports"))?;
+
+            let data = entry.data.as_ref();
+            report.push_str(&format!(
+                "{},{},{},{},{}\n",
+                context.network.as_str(),
+                context.stash,
+                context.description,
+                data.stash_account_display.address,
+                data.stash_account_display.display,
+            ))
+        }
+
+        Ok(vec![NominationReport(report)])
     }
     async fn publish(
         &self,
@@ -69,6 +101,13 @@ where
 
 impl From<NominationReport> for GoogleStoragePayload {
     fn from(val: NominationReport) -> Self {
-        unimplemented!()
+        let date = chrono::offset::Utc::now().to_rfc3339();
+
+        GoogleStoragePayload {
+            name: format!("nominations_{}.csv", date),
+            mime_type: "application/vnd.google-apps.document".to_string(),
+            body: val.0.into_bytes(),
+            is_public: false,
+        }
     }
 }

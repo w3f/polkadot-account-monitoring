@@ -96,7 +96,7 @@ where
 
             let amount = entry.data.amount.parse::<f64>()?;
 
-            let data = entry.data.to_owned();
+            let data = entry.data.as_ref();
             raw_all.push_str(&format!(
                 "{},{},{},{},{},{},{},{},{}\n",
                 context.network.as_str(),
