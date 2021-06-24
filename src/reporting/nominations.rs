@@ -29,7 +29,26 @@ where
         "NominationReportGenerator"
     }
     async fn fetch_data(&self) -> Result<Option<Self::Data>> {
-	unimplemented!()
+        let contexts = self.contexts.read().await;
+        let data = self
+            .reader
+            // Simply fetch everything as of now.
+            .fetch_nominations(
+                contexts.as_slice(),
+            )
+            .await?;
+
+        if data.is_empty() {
+            return Ok(None);
+        } else {
+            debug!(
+                "{}: Fetched {} entries from database",
+                <Self as GenerateReport<T>>::name(),
+                data.len()
+            );
+        }
+
+        Ok(Some(data))
     }
     async fn generate(&self, data: &Self::Data) -> Result<Vec<Self::Report>> {
 	unimplemented!()
