@@ -4,7 +4,6 @@ use crate::database::{ContextData, DatabaseReader};
 use crate::publishing::GoogleStoragePayload;
 use crate::publishing::Publisher;
 use crate::{Context, Result, Timestamp};
-use std::collections::HashMap;
 use std::marker::PhantomData;
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -88,8 +87,6 @@ where
                 .iter()
                 .find(|c| c.stash == entry.context_id.stash.clone().into_owned())
                 .ok_or(anyhow!("No context found while generating reports"))?;
-
-            let amount = entry.data.amount.parse::<f64>()?;
 
             let data = entry.data.as_ref();
             report.push_str(&format!(

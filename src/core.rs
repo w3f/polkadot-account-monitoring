@@ -2,8 +2,7 @@ use crate::chain_api::{ChainApi, NominationsPage, Response, RewardsSlashesPage, 
 use crate::database::{Database, DatabaseReader};
 use crate::publishing::{GoogleDrive, Publisher};
 use crate::reporting::{
-    GenerateReport, NominationReport, NominationReportGenerator, RewardSlashReportGenerator,
-    TransferReport, TransferReportGenerator,
+    GenerateReport, NominationReportGenerator, RewardSlashReportGenerator, TransferReportGenerator,
 };
 use crate::{Context, Result};
 
@@ -374,6 +373,7 @@ mod tests {
     use super::*;
     use crate::database::DatabaseReader;
     use crate::publishing::GoogleDrive;
+    use crate::reporting::TransferReport;
     use crate::tests::{db, init};
     use crate::wait_blocking;
     use std::sync::Arc;
@@ -446,18 +446,15 @@ mod tests {
         let db = DatabaseReader::new("mongodb://localhost:27017/", "monitor")
             .await
             .unwrap();
-
         let contexts = vec![Context::from("")];
-        let config = ReportTransferConfig {
-            report_range: 86_400,
-        };
         let publisher = Arc::new(StdOut);
 
-        let mut service = ReportGenerator::new(db);
+        let mut service = ReportGenerator::new(db.clone());
         service.add_contexts(contexts).await;
-        service
-            .run(ReportModule::Transfers(config), publisher, ())
-            .await;
+
+        let generator = TransferReportGenerator::new(db, Arc::clone(&service.contexts));
+
+        service.do_run(generator, publisher, ()).await;
         wait_blocking().await;
     }
 }

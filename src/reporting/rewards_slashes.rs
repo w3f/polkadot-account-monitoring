@@ -1,11 +1,9 @@
-/*  */
 use super::GenerateReport;
 use crate::chain_api::RewardSlash;
 use crate::database::{ContextData, DatabaseReader};
 use crate::publishing::GoogleStoragePayload;
 use crate::publishing::Publisher;
 use crate::{BlockNumber, Context, Network, Result};
-use std::collections::HashMap;
 use std::marker::PhantomData;
 use std::sync::Arc;
 use tokio::sync::RwLock;
