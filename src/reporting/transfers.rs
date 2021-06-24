@@ -10,10 +10,7 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 
 #[derive(Debug, Clone)]
-pub enum TransferReport {
-    All(String),
-    Summary(String),
-}
+pub struct TransferReport(String);
 
 pub struct TransferReportGenerator<'a> {
     reader: DatabaseReader,
@@ -82,10 +79,8 @@ where
         let contexts = self.contexts.read().await;
 
         // List all transfers.
-        let mut raw_all =
+        let mut report =
             String::from("Network,Block Number,Block Timestamp,From,Description,To,Amount,Extrinsic Index,Success\n");
-        // Create summary of all accounts.
-        let mut summary: HashMap<Context, f64> = HashMap::new();
 
         for entry in data {
             // TODO: Improve performance here.
@@ -97,7 +92,7 @@ where
             let amount = entry.data.amount.parse::<f64>()?;
 
             let data = entry.data.as_ref();
-            raw_all.push_str(&format!(
+            report.push_str(&format!(
                 "{},{},{},{},{},{},{},{},{}\n",
                 context.network.as_str(),
                 data.block_num,
@@ -109,30 +104,9 @@ where
                 data.extrinsic_index,
                 data.success,
             ));
-
-            // Sum amount for each context.
-            summary
-                .entry(context.clone())
-                .and_modify(|a| *a += amount)
-                .or_insert(amount);
         }
 
-        let mut raw_summary = String::from("Network,Address,Description,Amount\n");
-
-        for (context, amount) in summary {
-            raw_summary.push_str(&format!(
-                "{},{},{},{}\n",
-                context.network.as_str(),
-                context.stash,
-                context.description,
-                amount
-            ))
-        }
-
-        Ok(vec![
-            TransferReport::All(raw_all),
-            TransferReport::Summary(raw_summary),
-        ])
+        Ok(vec![TransferReport(report)])
     }
     async fn publish(
         &self,
@@ -152,23 +126,13 @@ where
 
 impl From<TransferReport> for GoogleStoragePayload {
     fn from(val: TransferReport) -> Self {
-        use TransferReport::*;
-
         let date = chrono::offset::Utc::now().to_rfc3339();
 
-        match val {
-            All(content) => GoogleStoragePayload {
-                name: format!("report_transfer_all_{}.csv", date),
-                mime_type: "application/vnd.google-apps.document".to_string(),
-                body: content.into_bytes(),
-                is_public: false,
-            },
-            Summary(content) => GoogleStoragePayload {
-                name: format!("report_transfer_summary_{}.csv", date),
-                mime_type: "application/vnd.google-apps.document".to_string(),
-                body: content.into_bytes(),
-                is_public: false,
-            },
+        GoogleStoragePayload {
+            name: format!("report_transfer_{}.csv", date),
+            mime_type: "application/vnd.google-apps.document".to_string(),
+            body: val.0.into_bytes(),
+            is_public: false,
         }
     }
 }
