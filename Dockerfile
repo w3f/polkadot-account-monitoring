@@ -3,7 +3,7 @@
 # Cargo Dependency Build Stage
 # ------------------------------------------------------------------------------
 
-FROM rust:1.46.0 AS builder
+FROM rust:nightly AS builder
 
 WORKDIR /app
 
