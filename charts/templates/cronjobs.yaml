@@ -1,0 +1,44 @@
+{{ if eq .Values.config.cronjob.enabled true }}
+apiVersion: batch/v1beta1
+kind: CronJob
+metadata:
+  name: {{ .Release.Name }}
+  labels:
+    app: {{ .Release.Name }}
+spec:
+  schedule: {{ .Values.cronjob.schedule | quote }}
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      activeDeadlineSeconds: 1200
+      template:
+        metadata:
+          labels:
+            app: {{ .Release.Name }}
+          annotations:
+            checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        spec:
+          containers:
+            - name: {{ .Chart.Name }}
+              image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+              imagePullPolicy: {{ .Values.image.pullPolicy }}
+              volumeMounts:
+              - name: config
+                mountPath: /app/config
+          volumes:
+          - name: config
+            configMap:
+              name: {{ .Release.Name }}
+          - name: accounts
+            secret:
+              secretName: {{ .Release.Name }}
+              items:
+                - key: monitorAccounts
+                  path: /app/config/accounts.json
+          - name: credentials
+            secret:
+              secretName: {{ .Release.Name }}
+              items:
+                - key: serviceAccountJson
+                  path: /app/config/credentials.json
+{{ end }}

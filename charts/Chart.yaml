@@ -1,0 +1,4 @@
+apiVersion: v2
+name: monitor-account-movement
+description: Polkadot/Kusama monitoring tool for specific addresses
+version: 0.1.0

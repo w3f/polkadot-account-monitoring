@@ -1,0 +1,46 @@
+replicaCount: 1
+
+image:
+  repository: lamafab/polkadot-account-monitoring
+  pullPolicy: IfNotPresent
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: v.0.1.0
+
+config:
+  log_level: debug
+  accounts_file: config/sample.accounts.yml
+  database:
+    uri: "mongodb://localhost:27017/"
+    name: "monitor"
+  # (optional): types of extrinsics to fetch from chain.
+  collection:
+    modules:
+      - transfer
+      - rewards_slashes
+      - nominations
+  # (optional): types of reports to generate
+  report:
+    modules:
+      - transfers
+    publisher:
+      type: google_drive
+      config:
+        bucket_name: report-bucket
+        credentials: config/credentials.json
+
+cronjob:
+  schedule: "* * * * *"
+
+secret:
+  accounts:
+    - stash: 1a2YiGNu1UUhJtihq8961c7FZtWGQuWDVMWTNBKJdmpGhZP
+      network: polkadot
+      description: Alice's account
+    - stash: 1b3NhsSEqWSQwS6nPGKgCrSjv9Kp13CnhraLV5Coyd8ooXB
+      network: polkadot
+      description: Bob's account
+    - stash: 1cNyFSmLW4ofr7xh38za6JxLFxcu548LPcfc1E6L9r57SE3
+      network: polkadot
+      description: Eve's account
+  serviceAccountJson: |
+    {"type":"service_account","project_id":"xxx","private_key_id":"xxx","private_key":"xxx"}
