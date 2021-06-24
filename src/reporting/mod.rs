@@ -4,6 +4,7 @@ use std::sync::Arc;
 
 mod rewards_slashes;
 mod transfers;
+mod nominations;
 
 pub use rewards_slashes::RewardSlashReportGenerator;
 pub use transfers::{TransferReport, TransferReportGenerator};
