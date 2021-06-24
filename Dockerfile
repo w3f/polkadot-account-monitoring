@@ -3,7 +3,7 @@
 # Cargo Dependency Build Stage
 # ------------------------------------------------------------------------------
 
-FROM rust:nightly AS builder
+FROM rustlang/rust:nightly-buster AS builder
 
 WORKDIR /app
 
@@ -36,8 +36,8 @@ WORKDIR /app
 
 RUN mkdir config
 
-COPY --from=builder /app/target/release/polkadot-account-monitoring .
+COPY --from=builder /app/target/release/monitor .
 COPY config/config.yml config/
 COPY config/accounts.yml config/
 
-CMD ["./polkadot-account-monitoring"]
+CMD ["./monitor"]
