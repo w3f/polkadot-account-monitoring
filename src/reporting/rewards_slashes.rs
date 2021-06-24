@@ -10,10 +10,7 @@ use std::marker::PhantomData;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
-pub enum RewardSlashReport {
-    All(String),
-    Summary(String),
-}
+pub struct RewardSlashReport(String);
 
 pub struct RewardSlashReportGenerator<'a> {
     reader: DatabaseReader,
@@ -80,8 +77,7 @@ where
         );
 
         let contexts = self.contexts.read().await;
-        let mut raw_all = String::from("Network,Block Number,Address,Description,Event,Value\n");
-        let mut summary: HashMap<Context, (f64, f64)> = HashMap::new();
+        let mut report = String::from("Network,Block Number,Address,Description,Event,Value\n");
 
         for entry in data {
             // TODO: Improve performance here.
@@ -97,7 +93,7 @@ where
                 Network::Polkadot => amount / 10_000_000_000.0,
             };
 
-            raw_all.push_str(&format!(
+            report.push_str(&format!(
                 "{},{},{},{},{},{}\n",
                 context.network.as_str(),
                 data.block_num,
@@ -106,43 +102,9 @@ where
                 data.event_id,
                 amount,
             ));
-
-            let event_id = match data.event_id.as_str() {
-                "Reward" => true,
-                "Slash" => false,
-                _ => return Err(anyhow!("Received unknown event id")),
-            };
-
-            summary
-                .entry(context.clone())
-                .and_modify(|(r, s)| match event_id {
-                    true => *r += amount,
-                    false => *s += amount,
-                })
-                .or_insert({
-                    match event_id {
-                        true => (amount, 0.0),
-                        false => (0.0, amount),
-                    }
-                });
         }
 
-        let mut raw_summary = String::from("Network,Address,Description,Reward,Slash\n");
-        for (context, (reward, slash)) in summary {
-            raw_summary.push_str(&format!(
-                "{},{},{},{},{}\n",
-                context.network.as_str(),
-                context.stash,
-                context.description,
-                reward,
-                slash,
-            ));
-        }
-
-        Ok(vec![
-            RewardSlashReport::All(raw_all),
-            RewardSlashReport::Summary(raw_summary),
-        ])
+        Ok(vec![RewardSlashReport(report)])
     }
     async fn publish(
         &self,
@@ -164,19 +126,11 @@ impl From<RewardSlashReport> for GoogleStoragePayload {
     fn from(val: RewardSlashReport) -> Self {
         let date = chrono::offset::Utc::now().to_rfc3339();
 
-        match val {
-            RewardSlashReport::All(content) => GoogleStoragePayload {
-                name: format!("rewards_slashes_all_{}.csv", date),
-                mime_type: "application/vnd.google-apps.document".to_string(),
-                body: content.into_bytes(),
-                is_public: false,
-            },
-            RewardSlashReport::Summary(content) => GoogleStoragePayload {
-                name: format!("rewards_slashes_summary_{}.csv", date),
-                mime_type: "application/vnd.google-apps.document".to_string(),
-                body: content.into_bytes(),
-                is_public: false,
-            },
+        GoogleStoragePayload {
+            name: format!("rewards_slashes_{}.csv", date),
+            mime_type: "application/vnd.google-apps.document".to_string(),
+            body: val.0.into_bytes(),
+            is_public: false,
         }
     }
 }
