@@ -1,20 +1,20 @@
-use crate::chain_api::{
-    ChainApi, NominationsPage, Response, RewardsSlashesPage, Transfer, TransfersPage,
+use crate::chain_api::{ChainApi, NominationsPage, Response, RewardsSlashesPage, TransfersPage};
+use crate::database::{Database, DatabaseReader};
+use crate::publishing::{GoogleDrive, Publisher};
+use crate::reporting::{
+    GenerateReport, NominationReportGenerator, RewardSlashReportGenerator, TransferReportGenerator,
 };
-use crate::database::{ContextData, Database, DatabaseReader};
-use crate::{Context, Result, Timestamp};
-use google_drive::GoogleDrive as RawGoogleDrive;
-use std::collections::{HashMap, HashSet};
-use std::marker::PhantomData;
+use crate::{Context, Result};
+
+use std::collections::HashSet;
+
 use std::sync::Arc;
-use tokio::sync::{Mutex, RwLock};
+use tokio::sync::RwLock;
 use tokio::time::{sleep, Duration};
-use yup_oauth2::{read_service_account_key, ServiceAccountAuthenticator};
 
 const ROW_AMOUNT: usize = 10;
 const FAILED_TASK_SLEEP: u64 = 30;
 const LOOP_INTERVAL: u64 = 300;
-const PUBLISHER_REQUEST_TIMEOUT: u64 = 1;
 
 pub struct TransferFetcher {
     db: Database,
@@ -264,15 +264,11 @@ impl<'a> ScrapingService<'a> {
 }
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case", tag = "type", content = "config")]
-pub enum ReportModule {
-    Transfers(ReportTransferConfig),
-}
-
-#[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub struct ReportTransferConfig {
-    report_range: u64,
+pub enum ReportModule {
+    Transfers,
+    RewardsSlashes,
+    Nominations,
 }
 
 pub struct ReportGenerator {
@@ -291,24 +287,26 @@ impl ReportGenerator {
     pub async fn add_contexts(&mut self, mut contexts: Vec<Context>) {
         self.contexts.write().await.append(&mut contexts);
     }
-    pub async fn run<P>(
+    pub async fn run(
         &mut self,
         module: ReportModule,
-        publisher: Arc<P>,
-        info: <P as Publisher>::Info,
-    ) where
-        P: 'static + Send + Sync + Publisher,
-        <P as Publisher>::Data: Send + Sync + From<TransferReportRaw>,
-        <P as Publisher>::Info: Send + Sync + Clone,
-    {
+        publisher: Arc<GoogleDrive>,
+        info: <GoogleDrive as Publisher>::Info,
+    ) {
         match module {
-            ReportModule::Transfers(config) => {
-                let generator = TransferReportGenerator::new(
-                    self.db.clone(),
-                    Arc::clone(&self.contexts),
-                    config.report_range,
-                );
-
+            ReportModule::Transfers => {
+                let generator =
+                    TransferReportGenerator::new(self.db.clone(), Arc::clone(&self.contexts));
+                self.do_run(generator, publisher, info).await;
+            }
+            ReportModule::RewardsSlashes => {
+                let generator =
+                    RewardSlashReportGenerator::new(self.db.clone(), Arc::clone(&self.contexts));
+                self.do_run(generator, publisher, info).await;
+            }
+            ReportModule::Nominations => {
+                let generator =
+                    NominationReportGenerator::new(self.db.clone(), Arc::clone(&self.contexts));
                 self.do_run(generator, publisher, info).await;
             }
         }
@@ -370,282 +368,13 @@ impl ReportGenerator {
     }
 }
 
-#[async_trait]
-trait GenerateReport<T: Publisher> {
-    type Data;
-    type Report;
-    type Config;
-
-    fn name() -> &'static str;
-    fn new(db: DatabaseReader, contexts: Arc<RwLock<Vec<Context>>>, config: Self::Config) -> Self;
-    async fn fetch_data(&self) -> Result<Option<Self::Data>>;
-    async fn generate(&self, data: &Self::Data) -> Result<Vec<Self::Report>>;
-    async fn publish(
-        &self,
-        publisher: Arc<T>,
-        info: <T as Publisher>::Info,
-        report: Self::Report,
-    ) -> Result<()>;
-}
-
-#[async_trait]
-pub trait Publisher {
-    type Data;
-    // TODO: Rename this to `Config`.
-    type Info;
-
-    async fn upload_data(&self, info: Self::Info, data: Self::Data) -> Result<()>;
-}
-
-pub struct GoogleDrive {
-    drive: RawGoogleDrive,
-    guard_lock: Arc<Mutex<()>>,
-}
-
-impl GoogleDrive {
-    pub async fn new(path: &str) -> Result<Self> {
-        let key = read_service_account_key(path).await?;
-        let auth = ServiceAccountAuthenticator::builder(key).build().await?;
-        let token = auth
-            .token(&[
-                "https://www.googleapis.com/auth/devstorage.read_write",
-                "https://www.googleapis.com/auth/drive",
-            ])
-            .await?;
-
-        if token.as_str().is_empty() {
-            return Err(anyhow!("returned Google auth token is invalid"));
-        }
-
-        Ok(GoogleDrive {
-            drive: RawGoogleDrive::new(token),
-            guard_lock: Default::default(),
-        })
-    }
-    async fn time_guard(&self) {
-        let mutex = Arc::clone(&self.guard_lock);
-        let guard = mutex.lock_owned().await;
-
-        tokio::spawn(async move {
-            // Capture guard, drops after sleeping period;
-            let _ = guard;
-            sleep(Duration::from_secs(PUBLISHER_REQUEST_TIMEOUT)).await;
-        });
-    }
-}
-
-#[async_trait]
-impl Publisher for GoogleDrive {
-    type Data = GoogleStoragePayload;
-    type Info = GoogleDriveUploadInfo;
-
-    async fn upload_data(&self, info: Self::Info, data: Self::Data) -> Result<()> {
-        self.time_guard().await;
-
-        self.drive
-            .upload_to_cloud_storage(
-                &info.bucket_name,
-                &data.name,
-                &data.mime_type,
-                &data.body,
-                data.is_public,
-            )
-            .await
-            .map(|_| ())
-            .map_err(|err| err.into())
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct GoogleDriveUploadInfo {
-    pub bucket_name: String,
-}
-
-impl From<TransferReportRaw> for GoogleStoragePayload {
-    fn from(val: TransferReportRaw) -> Self {
-        use TransferReportRaw::*;
-
-        match val {
-            All(content) => GoogleStoragePayload {
-                name: "report_transfer_all.csv".to_string(),
-                mime_type: "application/vnd.google-apps.document".to_string(),
-                body: content.into_bytes(),
-                is_public: false,
-            },
-            Summary(content) => GoogleStoragePayload {
-                name: "report_transfer_summary.csv".to_string(),
-                mime_type: "application/vnd.google-apps.document".to_string(),
-                body: content.into_bytes(),
-                is_public: false,
-            },
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct GoogleStoragePayload {
-    name: String,
-    mime_type: String,
-    body: Vec<u8>,
-    is_public: bool,
-}
-
-#[derive(Debug, Clone)]
-pub enum TransferReportRaw {
-    All(String),
-    Summary(String),
-}
-
-pub struct TransferReportGenerator<'a> {
-    report_range: u64,
-    last_report: Option<Timestamp>,
-    reader: DatabaseReader,
-    contexts: Arc<RwLock<Vec<Context>>>,
-    _p: PhantomData<&'a ()>,
-}
-
-impl<'a> TransferReportGenerator<'a> {
-    pub fn new(db: DatabaseReader, contexts: Arc<RwLock<Vec<Context>>>, report_range: u64) -> Self {
-        TransferReportGenerator {
-            report_range: report_range,
-            last_report: None,
-            reader: db,
-            contexts: contexts,
-            _p: PhantomData,
-        }
-    }
-}
-
-#[async_trait]
-impl<'a, T> GenerateReport<T> for TransferReportGenerator<'a>
-where
-    T: 'static + Send + Sync + Publisher,
-    <T as Publisher>::Data: Send + Sync + From<TransferReportRaw>,
-    <T as Publisher>::Info: Send + Sync,
-{
-    type Data = Vec<ContextData<'a, Transfer>>;
-    type Report = TransferReportRaw;
-    type Config = ReportTransferConfig;
-
-    fn name() -> &'static str {
-        "TransferReportGenerator"
-    }
-    fn new(db: DatabaseReader, contexts: Arc<RwLock<Vec<Context>>>, config: Self::Config) -> Self {
-        Self::new(db, contexts, config.report_range)
-    }
-    async fn fetch_data(&self) -> Result<Option<Self::Data>> {
-        let now = Timestamp::now();
-        let last_report = self.last_report.unwrap_or(Timestamp::from(0));
-
-        if last_report < (now - Timestamp::from(self.report_range)) {
-            let contexts = self.contexts.read().await;
-            let data = self
-                .reader
-                .fetch_transfers(contexts.as_slice(), last_report, now)
-                .await?;
-
-            if data.is_empty() {
-                return Ok(None);
-            } else {
-                debug!(
-                    "{}: Fetched {} entries from database",
-                    <Self as GenerateReport<T>>::name(),
-                    data.len()
-                );
-            }
-
-            // TODO: Update `last_report`
-
-            Ok(Some(data))
-        } else {
-            Ok(None)
-        }
-    }
-    async fn generate(&self, data: &Self::Data) -> Result<Vec<Self::Report>> {
-        if data.is_empty() {
-            return Ok(vec![]);
-        }
-
-        debug!(
-            "{}: Generating reports of {} database entries",
-            <Self as GenerateReport<T>>::name(),
-            data.len()
-        );
-
-        let contexts = self.contexts.read().await;
-
-        // List all transfers.
-        let mut raw_all =
-            String::from("Block Number,Block Timestamp,From,To,Amount,Extrinsic Index,Success\n");
-        // Create summary of all accounts.
-        let mut summary: HashMap<Context, f64> = HashMap::new();
-
-        for entry in data {
-            // TODO: Improve performance here.
-            let context = contexts
-                .iter()
-                .find(|c| c.stash == entry.context_id.stash.clone().into_owned())
-                .ok_or(anyhow!("No context found while generating reports"))?;
-
-            let amount = entry.data.amount.parse::<f64>()?;
-
-            let data = entry.data.to_owned();
-            raw_all.push_str(&format!(
-                "{},{},{},{},{},{},{}\n",
-                data.block_num,
-                data.block_timestamp,
-                data.from,
-                data.to,
-                data.amount,
-                data.extrinsic_index,
-                data.success,
-            ));
-
-            // Sum amount for each context.
-            summary
-                .entry(context.clone())
-                .and_modify(|a| *a += amount)
-                .or_insert(amount);
-        }
-
-        let mut raw_summary = String::from("Network,Address,Description,Amount\n");
-
-        for (context, amount) in summary {
-            raw_summary.push_str(&format!(
-                "{},{},{},{}\n",
-                context.network.as_str(),
-                context.stash,
-                context.description,
-                amount
-            ))
-        }
-
-        Ok(vec![
-            TransferReportRaw::All(raw_all),
-            TransferReportRaw::Summary(raw_summary),
-        ])
-    }
-    async fn publish(
-        &self,
-        publisher: Arc<T>,
-        info: <T as Publisher>::Info,
-        report: Self::Report,
-    ) -> Result<()> {
-        publisher
-            .upload_data(info, <T as Publisher>::Data::from(report))
-            .await?;
-
-        info!("Uploaded new report");
-
-        Ok(())
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::database::DatabaseReader;
-    use crate::tests::{db, generator, init};
+    use crate::publishing::GoogleDrive;
+    use crate::reporting::TransferReport;
+    use crate::tests::{db, init};
     use crate::wait_blocking;
     use std::sync::Arc;
     use std::vec;
@@ -654,10 +383,10 @@ mod tests {
 
     #[async_trait]
     impl Publisher for StdOut {
-        type Data = TransferReportRaw;
+        type Data = TransferReport;
         type Info = ();
 
-        async fn upload_data(&self, info: Self::Info, data: Self::Data) -> Result<()> {
+        async fn upload_data(&self, _info: Self::Info, data: Self::Data) -> Result<()> {
             println!("REPORT {:?}", data);
             Ok(())
         }
@@ -717,18 +446,15 @@ mod tests {
         let db = DatabaseReader::new("mongodb://localhost:27017/", "monitor")
             .await
             .unwrap();
-
         let contexts = vec![Context::from("")];
-        let config = ReportTransferConfig {
-            report_range: 86_400,
-        };
         let publisher = Arc::new(StdOut);
 
-        let mut service = ReportGenerator::new(db);
+        let mut service = ReportGenerator::new(db.clone());
         service.add_contexts(contexts).await;
-        service
-            .run(ReportModule::Transfers(config), publisher, ())
-            .await;
+
+        let generator = TransferReportGenerator::new(db, Arc::clone(&service.contexts));
+
+        service.do_run(generator, publisher, ()).await;
         wait_blocking().await;
     }
 }

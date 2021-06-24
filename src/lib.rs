@@ -7,13 +7,11 @@ extern crate log;
 #[macro_use]
 extern crate anyhow;
 
-use self::core::{
-    GoogleDrive, GoogleDriveUploadInfo, ReportGenerator, ReportModule, ScrapingModule,
-    ScrapingService,
-};
+use self::core::{ReportGenerator, ReportModule, ScrapingModule, ScrapingService};
 use anyhow::Error;
 use database::Database;
 use log::LevelFilter;
+use publishing::{GoogleDrive, GoogleDriveUploadInfo};
 use std::fmt;
 use std::ops::Sub;
 use std::sync::Arc;
@@ -57,6 +55,9 @@ impl Timestamp {
             .as_secs();
 
         Timestamp(time)
+    }
+    pub fn as_secs(&self) -> u64 {
+        self.0
     }
 }
 
@@ -127,17 +128,11 @@ pub struct Context {
 }
 
 impl Context {
-    pub fn as_str(&self) -> &str {
-        self.stash.as_str()
-    }
     pub fn id<'a>(&'a self) -> ContextId<'a> {
         ContextId {
             stash: Cow::Borrowed(&self.stash),
             network: self.network,
         }
-    }
-    pub fn network(&self) -> Network {
-        self.network
     }
 }
 
@@ -188,6 +183,7 @@ pub async fn run() -> Result<()> {
         info!("Adding {} accounts to monitor", account_count)
     }
 
+    let mut no_collection = false;
     if let Some(coll_config) = config.collection {
         info!("Setting up scraping service");
         let mut service = ScrapingService::new(db);
@@ -198,6 +194,7 @@ pub async fn run() -> Result<()> {
             service.run(module).await?;
         }
     } else {
+        no_collection = true;
         info!("No scraping modules are enabled");
     }
 
@@ -232,7 +229,11 @@ pub async fn run() -> Result<()> {
     }
 
     info!("Setup completed");
-    wait_blocking().await;
+    if no_collection {
+        sleep(Duration::from_secs(60 * 5)).await;
+    } else {
+        wait_blocking().await;
+    }
 
     Ok(())
 }
@@ -240,7 +241,7 @@ pub async fn run() -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::database::{Database, DatabaseReader};
+    use crate::database::Database;
     use log::LevelFilter;
     use rand::{thread_rng, Rng};
 
@@ -255,17 +256,6 @@ mod tests {
     pub async fn db() -> Database {
         let random: u32 = thread_rng().gen_range(u32::MIN..u32::MAX);
         Database::new(
-            "mongodb://localhost:27017/",
-            &format!("monitoring_test_{}", random),
-        )
-        .await
-        .unwrap()
-    }
-
-    // TODO: Rename this
-    pub async fn generator() -> DatabaseReader {
-        let random: u32 = thread_rng().gen_range(u32::MIN..u32::MAX);
-        DatabaseReader::new(
             "mongodb://localhost:27017/",
             &format!("monitoring_test_{}", random),
         )
