@@ -56,6 +56,9 @@ impl Timestamp {
 
         Timestamp(time)
     }
+    pub fn as_secs(&self) -> u64 {
+        self.0
+    }
 }
 
 impl Sub for Timestamp {

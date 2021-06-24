@@ -3,6 +3,7 @@ use crate::chain_api::Nomination;
 use crate::database::{ContextData, DatabaseReader};
 use crate::publishing::{GoogleStoragePayload, Publisher};
 use crate::{Context, Result};
+use chrono::{TimeZone, Utc};
 use std::marker::PhantomData;
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -71,7 +72,8 @@ where
 
         let contexts = self.contexts.read().await;
 
-        let mut report = String::from("Network,Address,Description,Validator,Display Name\n");
+        let mut report =
+            String::from("Detected,Network,Address,Description,Validator,Display Name\n");
 
         for entry in data {
             // TODO: Improve performance here.
@@ -82,7 +84,9 @@ where
 
             let data = entry.data.as_ref();
             report.push_str(&format!(
-                "{},{},{},{},{}\n",
+                "{},{},{},{},{},{}\n",
+                Utc.timestamp(entry.timestamp.as_secs() as i64, 0)
+                    .to_rfc3339(),
                 context.network.as_str(),
                 context.stash,
                 context.description,
