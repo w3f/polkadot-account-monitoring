@@ -6,6 +6,7 @@ mod nominations;
 mod rewards_slashes;
 mod transfers;
 
+pub use nominations::{NominationReport, NominationReportGenerator};
 pub use rewards_slashes::RewardSlashReportGenerator;
 pub use transfers::{TransferReport, TransferReportGenerator};
 

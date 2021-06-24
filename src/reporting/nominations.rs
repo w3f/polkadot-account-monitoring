@@ -7,13 +7,23 @@ use std::marker::PhantomData;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
+pub struct NominationReport(String);
+
 pub struct NominationReportGenerator<'a> {
     reader: DatabaseReader,
     contexts: Arc<RwLock<Vec<Context>>>,
     _p: PhantomData<&'a ()>,
 }
 
-pub struct NominationReport(String);
+impl<'a> NominationReportGenerator<'a> {
+    pub fn new(db: DatabaseReader, contexts: Arc<RwLock<Vec<Context>>>) -> Self {
+        NominationReportGenerator {
+            reader: db,
+            contexts: contexts,
+            _p: PhantomData,
+        }
+    }
+}
 
 #[async_trait]
 impl<'a, T> GenerateReport<T> for NominationReportGenerator<'a>

@@ -2,7 +2,8 @@ use crate::chain_api::{ChainApi, NominationsPage, Response, RewardsSlashesPage, 
 use crate::database::{Database, DatabaseReader};
 use crate::publishing::{GoogleDrive, Publisher};
 use crate::reporting::{
-    GenerateReport, RewardSlashReportGenerator, TransferReport, TransferReportGenerator,
+    GenerateReport, NominationReport, NominationReportGenerator, RewardSlashReportGenerator,
+    TransferReport, TransferReportGenerator,
 };
 use crate::{Context, Result};
 
@@ -268,6 +269,7 @@ impl<'a> ScrapingService<'a> {
 pub enum ReportModule {
     Transfers,
     RewardsSlashes,
+    Nominations,
 }
 
 pub struct ReportGenerator {
@@ -301,6 +303,11 @@ impl ReportGenerator {
             ReportModule::RewardsSlashes => {
                 let generator =
                     RewardSlashReportGenerator::new(self.db.clone(), Arc::clone(&self.contexts));
+                self.do_run(generator, publisher, info).await;
+            }
+            ReportModule::Nominations => {
+                let generator =
+                    NominationReportGenerator::new(self.db.clone(), Arc::clone(&self.contexts));
                 self.do_run(generator, publisher, info).await;
             }
         }
