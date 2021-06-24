@@ -13,7 +13,7 @@ pub struct NominationReportGenerator<'a> {
     _p: PhantomData<&'a ()>,
 }
 
-struct NominationReport(String);
+pub struct NominationReport(String);
 
 #[async_trait]
 impl<'a, T> GenerateReport<T> for NominationReportGenerator<'a>
