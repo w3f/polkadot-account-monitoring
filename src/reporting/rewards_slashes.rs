@@ -91,6 +91,11 @@ where
                 Network::Polkadot => amount / 10_000_000_000.0,
             };
 
+            if amount == 0.0 {
+                debug!("Skipping reward of 0 for {:?}", context);
+                continue;
+            }
+
             report.push_str(&format!(
                 "{},{},{},{},{},{}\n",
                 context.network.as_str(),
