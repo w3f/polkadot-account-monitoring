@@ -5,5 +5,5 @@ metadata:
 data:
   config.yml: |-
 {{ toYaml .Values.config | indent 4 }}
-  account.yml: |-
-{{ toYaml .Values.accounts | indent 4 }}
+  accounts.yml: |-
+{{ toYaml .Values.secret.monitorAccounts | indent 4 }}
