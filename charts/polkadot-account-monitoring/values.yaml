@@ -2,9 +2,9 @@ replicaCount: 1
 
 image:
   repository: lamafab/polkadot-account-monitoring
-  pullPolicy: IfNotPresent
+  pullPolicy: Always
   # Overrides the image tag whose default is the chart appVersion.
-  tag: v.0.1.0
+  tag: latest
 
 config:
   log_level: debug
@@ -32,7 +32,7 @@ cronjob:
   schedule: "* * * * *"
 
 secret:
-  accounts:
+  monitorAccounts:
     - stash: 1a2YiGNu1UUhJtihq8961c7FZtWGQuWDVMWTNBKJdmpGhZP
       network: polkadot
       description: Alice's account
