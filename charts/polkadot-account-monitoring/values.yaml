@@ -8,9 +8,9 @@ image:
 
 config:
   log_level: debug
-  accounts_file: config/sample.accounts.yml
+  accounts_file: accounts/accounts.yml
   database:
-    uri: "mongodb://localhost:27017/"
+    uri: "mongodb://username:password123@mongodb-0.mongodb-headless:27017,mongodb-1.mongodb-headless:27017/monitor"
     name: "monitor"
   # (optional): types of extrinsics to fetch from chain.
   collection:
@@ -19,17 +19,17 @@ config:
       - rewards_slashes
       - nominations
   # (optional): types of reports to generate
-  report:
-    modules:
-      - transfers
-    publisher:
-      type: google_drive
-      config:
-        bucket_name: report-bucket
-        credentials: config/credentials.json
-
-cronjob:
-  schedule: "* * * * *"
+  # report:
+  #   modules:
+  #     - transfers
+  #   publisher:
+  #     type: google_drive
+  #     config:
+  #       bucket_name: report-bucket
+  #       credentials: credentials/credentials.json
+  cronjob:
+    enabled: false
+    schedule: "* * * * *"
 
 secret:
   monitorAccounts:

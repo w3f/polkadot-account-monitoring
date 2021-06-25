@@ -22,20 +22,13 @@ spec:
           volumeMounts:
           - name: config
             mountPath: /app/config
+          - name: accounts
+            mountPath: /app/accounts   
       volumes:
       - name: config
         configMap:
-          name: {{ .Release.Name }}
+          name: {{ .Release.Name }}-config
       - name: accounts
-        secret:
-          secretName: {{ .Release.Name }}
-          items:
-            - key: monitorAccounts
-              path: /app/config/accounts.json
-      - name: credentials
-        secret:
-          secretName: {{ .Release.Name }}
-          items:
-            - key: serviceAccountJson
-              path: /app/config/credentials.json
+        configMap:
+          name: {{ .Release.Name }}-accounts  
 {{ end }}
