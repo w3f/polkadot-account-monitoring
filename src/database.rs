@@ -47,6 +47,21 @@ impl Database {
             db: Client::with_uri_str(uri).await?.database(db),
         })
     }
+    pub async fn check_connection(&self) -> Result<()> {
+        use std::time::Duration;
+        use tokio::time::timeout;
+
+        if let Err(_) = timeout(
+            Duration::from_secs(10),
+            self.db.list_collections(doc! {}, None),
+        )
+        .await
+        {
+            Err(anyhow!("Failed to connect to database..."))
+        } else {
+            Ok(())
+        }
+    }
     pub async fn store_transfer_event(
         &self,
         context: &Context,

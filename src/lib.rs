@@ -172,8 +172,12 @@ pub async fn run() -> Result<()> {
     let content = read_to_string(config.accounts_file)?;
     let accounts: Vec<Context> = serde_yaml::from_str(&content)?;
 
-    info!("Setting up database");
+    info!(
+        "Setting up database '{}', db name: {}",
+        config.database.uri, config.database.name
+    );
     let db = Database::new(&config.database.uri, &config.database.name).await?;
+    let _ = db.check_connection().await?;
     let reader = db.reader();
 
     let account_count = accounts.len();
