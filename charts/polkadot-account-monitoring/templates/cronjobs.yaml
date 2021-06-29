@@ -6,7 +6,7 @@ metadata:
   labels:
     app: {{ .Release.Name }}
 spec:
-  schedule: {{ .Values.cronjob.schedule | quote }}
+  schedule: {{ .Values.config.cronjob.schedule | quote }}
   concurrencyPolicy: Forbid
   jobTemplate:
     spec:
@@ -15,9 +15,8 @@ spec:
         metadata:
           labels:
             app: {{ .Release.Name }}
-          annotations:
-            checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
         spec:
+          restartPolicy: OnFailure
           containers:
             - name: {{ .Chart.Name }}
               image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
