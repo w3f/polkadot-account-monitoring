@@ -4,6 +4,7 @@ use crate::database::{ContextData, DatabaseReader};
 use crate::publishing::GoogleStoragePayload;
 use crate::publishing::Publisher;
 use crate::{Context, Result, Timestamp};
+use chrono::SecondsFormat;
 use std::marker::PhantomData;
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -123,7 +124,7 @@ where
 
 impl From<TransferReport> for GoogleStoragePayload {
     fn from(val: TransferReport) -> Self {
-        let date = chrono::offset::Utc::now().to_rfc3339();
+        let date = chrono::offset::Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true);
 
         GoogleStoragePayload {
             name: format!("{}_report_transfer.csv", date),

@@ -4,6 +4,7 @@ use crate::database::{ContextData, DatabaseReader};
 use crate::publishing::GoogleStoragePayload;
 use crate::publishing::Publisher;
 use crate::{BlockNumber, Context, Network, Result};
+use chrono::SecondsFormat;
 use std::marker::PhantomData;
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -127,7 +128,7 @@ where
 
 impl From<RewardSlashReport> for GoogleStoragePayload {
     fn from(val: RewardSlashReport) -> Self {
-        let date = chrono::offset::Utc::now().to_rfc3339();
+        let date = chrono::offset::Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true);
 
         GoogleStoragePayload {
             name: format!("{}_rewards_slashes.csv", date),

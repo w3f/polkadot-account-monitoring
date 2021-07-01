@@ -3,7 +3,7 @@ use crate::chain_api::Nomination;
 use crate::database::{ContextData, DatabaseReader};
 use crate::publishing::{GoogleStoragePayload, Publisher};
 use crate::{Context, Result};
-use chrono::{TimeZone, Utc};
+use chrono::{SecondsFormat, TimeZone, Utc};
 use std::marker::PhantomData;
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -115,7 +115,7 @@ where
 
 impl From<NominationReport> for GoogleStoragePayload {
     fn from(val: NominationReport) -> Self {
-        let date = chrono::offset::Utc::now().to_rfc3339();
+        let date = chrono::offset::Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true);
 
         GoogleStoragePayload {
             name: format!("{}_nominations.csv", date),
