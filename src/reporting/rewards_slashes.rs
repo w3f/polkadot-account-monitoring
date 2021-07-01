@@ -130,7 +130,7 @@ impl From<RewardSlashReport> for GoogleStoragePayload {
         let date = chrono::offset::Utc::now().to_rfc3339();
 
         GoogleStoragePayload {
-            name: format!("rewards_slashes_{}.csv", date),
+            name: format!("{}_rewards_slashes.csv", date),
             mime_type: "application/vnd.google-apps.document".to_string(),
             body: val.0.into_bytes(),
             is_public: false,

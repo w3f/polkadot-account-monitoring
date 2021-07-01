@@ -126,7 +126,7 @@ impl From<TransferReport> for GoogleStoragePayload {
         let date = chrono::offset::Utc::now().to_rfc3339();
 
         GoogleStoragePayload {
-            name: format!("report_transfer_{}.csv", date),
+            name: format!("{}_report_transfer.csv", date),
             mime_type: "application/vnd.google-apps.document".to_string(),
             body: val.0.into_bytes(),
             is_public: false,
