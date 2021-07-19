@@ -128,10 +128,10 @@ where
 
 impl From<RewardSlashReport> for GoogleStoragePayload {
     fn from(val: RewardSlashReport) -> Self {
-        let date = chrono::offset::Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true);
+        let _date = chrono::offset::Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true);
 
         GoogleStoragePayload {
-            name: format!("{}_rewards_slashes.csv", date),
+            name: format!("rewards_slashes.csv"),
             mime_type: "application/vnd.google-apps.document".to_string(),
             body: val.0.into_bytes(),
             is_public: false,

@@ -115,10 +115,10 @@ where
 
 impl From<NominationReport> for GoogleStoragePayload {
     fn from(val: NominationReport) -> Self {
-        let date = chrono::offset::Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true);
+        let _date = chrono::offset::Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true);
 
         GoogleStoragePayload {
-            name: format!("{}_nominations.csv", date),
+            name: format!("nominations.csv"),
             mime_type: "application/vnd.google-apps.document".to_string(),
             body: val.0.into_bytes(),
             is_public: false,

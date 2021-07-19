@@ -124,10 +124,10 @@ where
 
 impl From<TransferReport> for GoogleStoragePayload {
     fn from(val: TransferReport) -> Self {
-        let date = chrono::offset::Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true);
+        let _date = chrono::offset::Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true);
 
         GoogleStoragePayload {
-            name: format!("{}_report_transfer.csv", date),
+            name: format!("report_transfer.csv"),
             mime_type: "application/vnd.google-apps.document".to_string(),
             body: val.0.into_bytes(),
             is_public: false,
