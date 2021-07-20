@@ -1,4 +1,4 @@
 target
-config/config.yml
-config/accounts.yml
-config/credentials.json
+config/
+!config/*sample*
+!helmfile.d/config

@@ -1,0 +1,14 @@
+
+{{ if eq .Environment.Name "ci" }}
+image:
+  tag: {{ env "CIRCLE_SHA1" | default "kind" }}
+{{ else if eq .Environment.Name "local" }}
+image:
+  repo: localhost:5000/polkadot-account-monitoring
+  tag: latest
+{{ end }}
+
+config:
+  database:
+    uri: "mongodb://{{ env "MONGO_USERNAME" | default "username" }}:{{ env "MONGO_PASSWORD" | default "password123" }}@mongodb-0.mongodb-headless:27017,mongodb-1.mongodb-headless:27017/{{ env "MONGO_DB" | default "monitor" }}"
+    name: {{ env "MONGO_DB" | default "monitor" }}

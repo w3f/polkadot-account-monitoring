@@ -1,10 +1,10 @@
 replicaCount: 1
 
 image:
-  repository: lamafab/polkadot-account-monitoring
+  repository: web3f/polkadot-account-monitoring
   pullPolicy: Always
   # Overrides the image tag whose default is the chart appVersion.
-  tag: latest
+  tag: v0.1.0
 
 config:
   log_level: debug
