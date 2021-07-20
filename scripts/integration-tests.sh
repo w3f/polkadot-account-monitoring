@@ -7,11 +7,11 @@ source /scripts/bootstrap-helm.sh
 run_tests() {
     echo Running tests...
 
-    wait_pod_ready polkadot-account-monitoring
+    wait_pod_ready polkadot-account-monitor
 }
 
 teardown() {
-    helm delete polkadot-account-monitoring
+    helm delete polkadot-account-monitor
 }
 
 main(){
