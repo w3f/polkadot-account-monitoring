@@ -1,4 +1,4 @@
 apiVersion: v2
 name: polkadot-account-monitoring
 description: Polkadot/Kusama monitoring tool for specific addresses
-version: 0.1.0
+version: v0.1.0
