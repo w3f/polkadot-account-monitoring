@@ -37,7 +37,7 @@ WORKDIR /app
 RUN mkdir config
 
 COPY --from=builder /app/target/release/monitor .
-COPY config/config.yml config/
-COPY config/accounts.yml config/
+#COPY config/config.yml config/
+#COPY config/accounts.yml config/
 
 CMD ["./monitor"]
