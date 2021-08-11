@@ -129,7 +129,7 @@ struct Address<'a> {
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Response<T> {
-    pub code: usize,
+    pub code: Option<usize>,
     pub data: T,
     pub message: String,
     pub ttl: Option<usize>,
