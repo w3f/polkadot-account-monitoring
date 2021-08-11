@@ -132,7 +132,7 @@ pub struct Response<T> {
     pub code: usize,
     pub data: T,
     pub message: String,
-    pub ttl: usize,
+    pub ttl: Option<usize>,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]

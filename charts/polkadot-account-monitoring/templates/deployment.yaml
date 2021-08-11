@@ -1,4 +1,4 @@
-{{ if ne .Values.config.cronjob.enabled true }}
+{{ if eq .Values.useDeployment true }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
