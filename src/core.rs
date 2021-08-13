@@ -4,7 +4,7 @@ use crate::publishing::{GoogleDrive, Publisher};
 use crate::reporting::{
     GenerateReport, NominationReportGenerator, RewardSlashReportGenerator, TransferReportGenerator,
 };
-use crate::{Context, Result};
+use crate::{Context, Result, Timestamp};
 
 use std::collections::HashSet;
 
@@ -15,6 +15,7 @@ use tokio::time::{sleep, Duration};
 const ROW_AMOUNT: usize = 10;
 const FAILED_TASK_SLEEP: u64 = 30;
 const LOOP_INTERVAL: u64 = 300;
+const MAX_ERR_DIFF: u64 = 60;
 
 pub struct TransferFetcher {
     db: Database,
@@ -351,15 +352,30 @@ impl ReportGenerator {
 
         tokio::spawn(async move {
             info!("{}: Running event loop...", T::name());
+            let mut last_err = Timestamp::now();
+
             loop {
                 if let Err(err) =
                     local::<T, P>(&generator, Arc::clone(&publisher), info.clone()).await
                 {
-                    error!(
-                        "Failed task while running report generator '{}': {:?}",
-                        T::name(),
-                        err
-                    );
+                    // Only print errors when two or more occur within one
+                    // minute. Sometimes the Subscan API just returns an empty
+                    // value.
+                    if Timestamp::now().as_secs() - last_err.as_secs() < MAX_ERR_DIFF {
+                        error!(
+                            "Failed task while running report generator '{}': {:?}",
+                            T::name(),
+                            err
+                        );
+                    } else {
+                        debug!(
+                            "(Acceptable) Failed task while running report generator '{}': {:?}",
+                            T::name(),
+                            err
+                        );
+                    }
+
+                    last_err = Timestamp::now();
                 }
 
                 sleep(Duration::from_secs(FAILED_TASK_SLEEP)).await;
