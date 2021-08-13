@@ -7,7 +7,7 @@ use std::sync::Arc;
 use tokio::sync::Mutex;
 use tokio::time::{sleep, Duration};
 
-const REQUEST_TIMEOUT: u64 = 5;
+const REQUEST_TIMEOUT: u64 = 10;
 
 pub struct ChainApi {
     client: Client,
