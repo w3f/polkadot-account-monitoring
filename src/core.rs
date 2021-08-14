@@ -247,15 +247,30 @@ impl<'a> ScrapingService<'a> {
 
         let fetcher = T::new(self.db.clone(), Arc::clone(&self.api));
         let contexts = Arc::clone(&self.contexts);
+        let mut last_err = Timestamp::now();
+
         tokio::spawn(async move {
             info!("{}: Running event loop...", T::name());
             loop {
                 if let Err(err) = local(&fetcher, &contexts).await {
-                    error!(
-                        "Failed task while running fetcher '{}': {:?}",
-                        T::name(),
-                        err
-                    );
+                    // Only print errors when two or more occur within one
+                    // minute. Sometimes the Subscan API just returns an empty
+                    // value.
+                    if Timestamp::now().as_secs() - last_err.as_secs() < MAX_ERR_DIFF {
+                        error!(
+                            "Failed task while running fetcher '{}': {:?}",
+                            T::name(),
+                            err
+                        );
+                    } else {
+                        debug!(
+                            "(Acceptable) Failed task while running fetcher '{}': {:?}",
+                            T::name(),
+                            err
+                        );
+                    }
+
+                    last_err = Timestamp::now();
                 }
 
                 sleep(Duration::from_secs(FAILED_TASK_SLEEP)).await;
@@ -352,30 +367,16 @@ impl ReportGenerator {
 
         tokio::spawn(async move {
             info!("{}: Running event loop...", T::name());
-            let mut last_err = Timestamp::now();
 
             loop {
                 if let Err(err) =
                     local::<T, P>(&generator, Arc::clone(&publisher), info.clone()).await
                 {
-                    // Only print errors when two or more occur within one
-                    // minute. Sometimes the Subscan API just returns an empty
-                    // value.
-                    if Timestamp::now().as_secs() - last_err.as_secs() < MAX_ERR_DIFF {
-                        error!(
-                            "Failed task while running report generator '{}': {:?}",
-                            T::name(),
-                            err
-                        );
-                    } else {
-                        debug!(
-                            "(Acceptable) Failed task while running report generator '{}': {:?}",
-                            T::name(),
-                            err
-                        );
-                    }
-
-                    last_err = Timestamp::now();
+                    error!(
+                        "Failed task while running report generator '{}': {:?}",
+                        T::name(),
+                        err
+                    );
                 }
 
                 sleep(Duration::from_secs(FAILED_TASK_SLEEP)).await;
