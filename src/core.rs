@@ -264,9 +264,8 @@ impl<'a> ScrapingService<'a> {
                         );
                     } else {
                         debug!(
-                            "(Acceptable) Failed task while running fetcher '{}': {:?}",
+                            "(Acceptable) Failed task while running fetcher '{}'",
                             T::name(),
-                            err
                         );
                     }
 
