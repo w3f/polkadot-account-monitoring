@@ -1,14 +1,12 @@
 environments:
   ci:
-  local:  
-
+  local:
 repositories:
-- name: bitnami
-  url: https://charts.bitnami.com/bitnami
-
+  - name: bitnami
+    url: https://charts.bitnami.com/bitnami
 releases:
-- name: mongodb
-  chart: bitnami/mongodb
-  version: 11.0.3
-  values:
-  - ./config/mongodb.yaml.gotmpl
+  - name: mongodb
+    chart: bitnami/mongodb
+    version: 11.0.4
+    values:
+      - ./config/mongodb.yaml.gotmpl
