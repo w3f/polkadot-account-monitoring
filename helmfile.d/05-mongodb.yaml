@@ -7,6 +7,6 @@ repositories:
 releases:
   - name: mongodb
     chart: bitnami/mongodb
-    version: 11.0.5
+    version: 11.0.6
     values:
       - ./config/mongodb.yaml.gotmpl
