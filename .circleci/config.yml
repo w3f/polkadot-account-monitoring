@@ -4,7 +4,7 @@ jobs:
 
   buildImage:
     docker:
-      - image: web3f/ci-commons:v3.0.0
+      - image: web3f/ci-commons:v3.1.6
     resource_class: xlarge  
     steps:
       - checkout
@@ -15,7 +15,7 @@ jobs:
             /scripts/build-image.sh web3f/polkadot-account-monitoring .
   publishImage:
     docker:
-      - image: web3f/ci-commons:v3.0.0
+      - image: web3f/ci-commons:v3.1.6
     steps:
       - checkout
       - setup_remote_docker
@@ -24,7 +24,7 @@ jobs:
             /scripts/publish-image.sh web3f/polkadot-account-monitoring
   publishChart:
     docker:
-      - image: web3f/ci-commons:v3.0.0
+      - image: web3f/ci-commons:v3.1.6
     steps:
       - checkout
       - run:
@@ -32,7 +32,7 @@ jobs:
             /scripts/publish-chart.sh
   integrationTests:
     docker:
-      - image: web3f/ci-commons:v3.0.0
+      - image: web3f/ci-commons:v3.1.6
     resource_class: large    
     steps:
       - checkout
